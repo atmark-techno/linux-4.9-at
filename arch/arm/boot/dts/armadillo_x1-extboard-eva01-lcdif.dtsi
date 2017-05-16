@@ -9,7 +9,7 @@
 / {
 	x1_extboard_eva01_backlight {
 		compatible = "pwm-backlight";
-		pwms = <&pwm1 0 5000000>;
+		pwms = <&pwm1 0 5000000 0>;
 		brightness-levels = <0 255 224 192 160 128 96 64 32 0>;
 		default-brightness-level = <7>;
 		status = "okay";
