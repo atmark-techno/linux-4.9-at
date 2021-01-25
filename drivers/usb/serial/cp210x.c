@@ -23,6 +23,7 @@
 #include <linux/usb.h>
 #include <linux/uaccess.h>
 #include <linux/usb/serial.h>
+#include <linux/mutex.h>
 
 #define DRIVER_DESC "Silicon Labs CP210x RS232 serial adaptor driver"
 
@@ -236,6 +237,8 @@ MODULE_DEVICE_TABLE(usb, id_table);
 struct cp210x_port_private {
 	__u8			bInterfaceNumber;
 	bool			has_swapped_line_ctl;
+	struct mutex		mutex;
+	bool			crtscts;
 };
 
 static struct usb_serial_driver cp210x_device = {
@@ -926,6 +929,7 @@ static void cp210x_change_speed(struct tty_struct *tty,
 static void cp210x_set_termios(struct tty_struct *tty,
 		struct usb_serial_port *port, struct ktermios *old_termios)
 {
+	struct cp210x_port_private *port_priv = usb_get_serial_port_data(port);
 	struct device *dev = &port->dev;
 	unsigned int cflag, old_cflag;
 	u16 bits;
@@ -1015,9 +1019,13 @@ static void cp210x_set_termios(struct tty_struct *tty,
 		struct cp210x_flow_ctl flow_ctl;
 		u32 ctl_hs;
 		u32 flow_repl;
+		int ret;
 
-		cp210x_read_reg_block(port, CP210X_GET_FLOW, &flow_ctl,
+		mutex_lock(&port_priv->mutex);
+		ret = cp210x_read_reg_block(port, CP210X_GET_FLOW, &flow_ctl,
 				sizeof(flow_ctl));
+		if (ret)
+			goto out_unlock;
 		ctl_hs = le32_to_cpu(flow_ctl.ulControlHandshake);
 		flow_repl = le32_to_cpu(flow_ctl.ulFlowReplace);
 		dev_dbg(dev, "%s - read ulControlHandshake=0x%08x, ulFlowReplace=0x%08x\n",
@@ -1035,6 +1043,7 @@ static void cp210x_set_termios(struct tty_struct *tty,
 			flow_repl |= CP210X_SERIAL_RTS_SHIFT(
 					CP210X_SERIAL_RTS_FLOW_CTL);
 			dev_dbg(dev, "%s - flow control = CRTSCTS\n", __func__);
+			port_priv->crtscts = true;
 		} else {
 			ctl_hs &= ~CP210X_SERIAL_CTS_HANDSHAKE;
 
@@ -1042,6 +1051,7 @@ static void cp210x_set_termios(struct tty_struct *tty,
 			flow_repl |= CP210X_SERIAL_RTS_SHIFT(
 					CP210X_SERIAL_RTS_ACTIVE);
 			dev_dbg(dev, "%s - flow control = NONE\n", __func__);
+			port_priv->crtscts = false;
 		}
 
 		dev_dbg(dev, "%s - write ulControlHandshake=0x%08x, ulFlowReplace=0x%08x\n",
@@ -1050,6 +1060,8 @@ static void cp210x_set_termios(struct tty_struct *tty,
 		flow_ctl.ulFlowReplace = cpu_to_le32(flow_repl);
 		cp210x_write_reg_block(port, CP210X_SET_FLOW, &flow_ctl,
 				sizeof(flow_ctl));
+out_unlock:
+		mutex_unlock(&port_priv->mutex);
 	}
 
 }
@@ -1064,7 +1076,9 @@ static int cp210x_tiocmset(struct tty_struct *tty,
 static int cp210x_tiocmset_port(struct usb_serial_port *port,
 		unsigned int set, unsigned int clear)
 {
+	struct cp210x_port_private *port_priv = usb_get_serial_port_data(port);
 	u16 control = 0;
+	int ret;
 
 	if (set & TIOCM_RTS) {
 		control |= CONTROL_RTS;
@@ -1083,9 +1097,22 @@ static int cp210x_tiocmset_port(struct usb_serial_port *port,
 		control |= CONTROL_WRITE_DTR;
 	}
 
+	mutex_lock(&port_priv->mutex);
+
+	/*
+	 * SET_MHS cannot be used to control RTS when auto-RTS is enabled.
+	 * Note that RTS is still deasserted when disabling the UART on close.
+	 */
+	if (port_priv->crtscts)
+		control &= ~CONTROL_WRITE_RTS;
+
 	dev_dbg(&port->dev, "%s - control = 0x%.4x\n", __func__, control);
 
-	return cp210x_write_u16_reg(port, CP210X_SET_MHS, control);
+	ret = cp210x_write_u16_reg(port, CP210X_SET_MHS, control);
+
+	mutex_unlock(&port_priv->mutex);
+
+	return ret;
 }
 
 static void cp210x_dtr_rts(struct usb_serial_port *p, int on)
@@ -1145,6 +1172,7 @@ static int cp210x_port_probe(struct usb_serial_port *port)
 
 	cur_altsetting = serial->interface->cur_altsetting;
 	port_priv->bInterfaceNumber = cur_altsetting->desc.bInterfaceNumber;
+	mutex_init(&port_priv->mutex);
 
 	usb_set_serial_port_data(port, port_priv);
 
