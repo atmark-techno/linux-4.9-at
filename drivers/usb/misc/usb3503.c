@@ -52,6 +52,9 @@
 #define USB3503_CFGP		0xee
 #define USB3503_CLKSUSP		(1 << 7)
 
+#define USB3503_VSNSUP3		0xf4
+#define USB3503_DN3_SQUELCH_MASK (0x7 << 0)
+
 #define USB3503_VSNS21		0xf5
 #define USB3503_DN2_SQUELCH_MASK (0x7 << 4)
 #define USB3503_DN1_SQUELCH_MASK (0x7 << 0)
@@ -64,6 +67,7 @@ struct usb3503 {
 	struct device		*dev;
 	struct clk		*clk;
 	u8	port_off_mask;
+	u32	varisense_up3;
 	u32	varisense_21;
 	int	gpio_intn;
 	int	gpio_reset;
@@ -120,6 +124,18 @@ static int usb3503_connect(struct usb3503 *hub)
 					 USB3503_SELF_BUS_PWR);
 		if (err < 0) {
 			dev_err(dev, "CFG1 failed (%d)\n", err);
+			return err;
+		}
+
+		/*
+		 * VSNSUP3: control the Squelch setting
+		 * Default = 0x00h
+		 */
+		err = regmap_update_bits(hub->regmap, USB3503_VSNSUP3,
+					 USB3503_DN3_SQUELCH_MASK,
+					 hub->varisense_up3);
+		if (err < 0) {
+			dev_err(dev, "VSNSUP3 failed (%d)\n", err);
 			return err;
 		}
 
@@ -259,6 +275,9 @@ static int usb3503_probe(struct usb3503 *hub)
 				return -EINVAL;
 			}
 		}
+
+		if (!of_property_read_u32(np, "vsnsup3-squelch", &squelch))
+			hub->varisense_up3 = squelch;
 
 		if (!of_property_read_u32(np, "vsns21-squelch", &squelch))
 			hub->varisense_21 = squelch;
