@@ -123,15 +123,6 @@ static int usb3503_connect(struct usb3503 *hub)
 			return err;
 		}
 
-		/* SP_LOCK: clear connect_n, config_n for hub connect */
-		err = regmap_update_bits(hub->regmap, USB3503_SP_ILOCK,
-					 (USB3503_SPILOCK_CONNECT
-					  | USB3503_SPILOCK_CONFIG), 0);
-		if (err < 0) {
-			dev_err(dev, "SP_ILOCK failed (%d)\n", err);
-			return err;
-		}
-
 		/*
 		 * VSNS21: control the Squelch setting
 		 * Default = 0x00h
@@ -141,6 +132,15 @@ static int usb3503_connect(struct usb3503 *hub)
 					 hub->varisense_21);
 		if (err < 0) {
 			dev_err(dev, "VSNS21 failed (%d)\n", err);
+			return err;
+		}
+
+		/* SP_LOCK: clear connect_n, config_n for hub connect */
+		err = regmap_update_bits(hub->regmap, USB3503_SP_ILOCK,
+					 (USB3503_SPILOCK_CONNECT
+					  | USB3503_SPILOCK_CONFIG), 0);
+		if (err < 0) {
+			dev_err(dev, "SP_ILOCK failed (%d)\n", err);
 			return err;
 		}
 	}
