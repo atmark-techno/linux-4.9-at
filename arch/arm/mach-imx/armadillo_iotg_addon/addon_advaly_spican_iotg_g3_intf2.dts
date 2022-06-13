@@ -37,11 +37,11 @@
 	fragment@1 {
 		target-path = "/";
 		__overlay__ {
-			clk20m: clk@1 {
+			clk20m2: dummy@2 {
 				compatible = "fixed-clock";
 				#clock-cells = <0>;
 				clock-frequency = <20000000>;
-				clock-output-names = "clk20m";
+				clock-output-names = "clk20m2";
 			};
 		};
 	};
@@ -60,7 +60,7 @@
 			can@0 {
 				compatible = "microchip,mcp2515";
 				reg = <0>;
-				clocks = <&clk20m>;
+				clocks = <&clk20m2>;
 				spi-max-frequency = <10000000>;
 				interrupt-parent = <&gpio6>;
 				interrupts = <20 IRQ_TYPE_EDGE_FALLING>;
