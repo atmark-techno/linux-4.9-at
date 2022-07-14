@@ -2224,8 +2224,8 @@ again:
 	if (!ida_pre_get(&mmc_blk_ida, GFP_KERNEL))
 		return ERR_PTR(-ENOMEM);
 
-	spin_lock(&mmc_blk_lock);
 	devidx = mmc_get_reserved_index(card->host);
+	spin_lock(&mmc_blk_lock);
 	if (devidx >= 0)
 		devidx = ida_simple_get(&mmc_blk_ida, devidx, devidx,
 					GFP_NOWAIT);
