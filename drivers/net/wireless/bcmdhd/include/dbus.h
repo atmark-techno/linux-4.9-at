@@ -2,14 +2,14 @@
  * Dongle BUS interface Abstraction layer
  *   target serial buses like USB, SDIO, SPI, etc.
  *
- * Copyright (C) 1999-2016, Broadcom Corporation
- * 
+ * Copyright (C) 2020, Broadcom.
+ *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
  * under the terms of the GNU General Public License version 2 (the "GPL"),
  * available at http://www.broadcom.com/licenses/GPLv2.php, with the
  * following added to such license:
- * 
+ *
  *      As a special exception, the copyright holders of this software give you
  * permission to link this software with independent modules, and to copy and
  * distribute the resulting executable under terms of your choice, provided that
@@ -17,23 +17,31 @@
  * the license of that module.  An independent module is a module which is not
  * derived from this software.  The special exception does not apply to any
  * modifications of the software.
- * 
- *      Notwithstanding the above, under no circumstances may you combine this
- * software in any way with any other Broadcom software provided under a license
- * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dbus.h 423346 2013-09-11 22:38:40Z $
+ *
+ * <<Broadcom-WL-IPTag/Open:>>
  */
 
 #ifndef __DBUS_H__
 #define __DBUS_H__
 
 #include "typedefs.h"
+#include <dhd_linux.h>
 
-#define DBUSTRACE(args)
+extern uint dbus_msglevel;
+#define DBUS_ERROR_VAL	0x0001
+#define DBUS_TRACE_VAL	0x0002
+#define DBUS_INFO_VAL	0x0004
+
+#if defined(DHD_DEBUG)
+#define DBUSERR(args)		do {if (dbus_msglevel & DBUS_ERROR_VAL) printf args;} while (0)
+#define DBUSTRACE(args)		do {if (dbus_msglevel & DBUS_TRACE_VAL) printf args;} while (0)
+#define DBUSINFO(args)		do {if (dbus_msglevel & DBUS_INFO_VAL) printf args;} while (0)
+#else /* defined(DHD_DEBUG) */
 #define DBUSERR(args)
+#define DBUSTRACE(args)
 #define DBUSINFO(args)
-#define DBUSDBGLOCK(args)
+#endif
 
 enum {
 	DBUS_OK = 0,
@@ -56,12 +64,9 @@ enum {
 	DBUS_ERR_NVRAM,
 	DBUS_JUMBO_NOMATCH,
 	DBUS_JUMBO_BAD_FORMAT,
-	DBUS_NVRAM_NONTXT
+	DBUS_NVRAM_NONTXT,
+	DBUS_ERR_RXZLP
 };
-
-#define BCM_OTP_SIZE_43236  84	/* number of 16 bit values */
-#define BCM_OTP_SW_RGN_43236	24  /* start offset of SW config region */
-#define BCM_OTP_ADDR_43236 0x18000800 /* address of otp base */
 
 #define ERR_CBMASK_TXFAIL		0x00000001
 #define ERR_CBMASK_RXFAIL		0x00000002
@@ -76,13 +81,32 @@ enum {
 #define DBUS_TX_RETRY_LIMIT		3		/* retries for failed txirb */
 #define DBUS_TX_TIMEOUT_INTERVAL	250		/* timeout for txirb complete, in ms */
 
+/*
+ * The max TCB/RCB data buffer size
+ * With USB RPC aggregation on,
+ *   rx buffer has to be a single big chunk memory due to dongle->host aggregation
+ *     Upper layer has to do byte copy to deaggregate the buffer to satisfy WL driver
+ *       one buffer per pkt requirement
+ *     Windows Vista may be able to use MDL to workaround this requirement
+ *   tx buffer has to copy over RPC buffer since they are managed in different domain
+ *     Without copy, DBUS and RPC has to break the encapsulation, which is not implemented
+ *     RPC aggregated buffer arrives as a chained buffers. bypte copy needs to traverse the chain
+ *     to form one continuous USB irb.
+ *   These buffer size must accomodate the MAX rpc agg size in both direction
+ *   #define BCM_RPC_TP_DNGL_AGG_MAX_BYTE
+ *   #define BCM_RPC_TP_HOST_AGG_MAX_BYTE
+ * Without USB RPC aggregation, these buffer size can be smaller like normal 2K
+ *  to fit max tcp pkt(ETH_MAX_DATA_SIZE) + d11/phy/rpc/overhead
+ *
+ * The number of buffer needed is upper layer dependent. e.g. rpc defines BCM_RPC_TP_DBUS_NTXQ
+ */
 #define DBUS_BUFFER_SIZE_TX	32000
 #define DBUS_BUFFER_SIZE_RX	24000
 
 #define DBUS_BUFFER_SIZE_TX_NOAGG	2048
 #define DBUS_BUFFER_SIZE_RX_NOAGG	2048
 
-/* DBUS types */
+/** DBUS types */
 enum {
 	DBUS_USB,
 	DBUS_SDIO,
@@ -97,7 +121,8 @@ enum dbus_state {
 	DBUS_STATE_DOWN,
 	DBUS_STATE_PNP_FWDL,
 	DBUS_STATE_DISCONNECT,
-	DBUS_STATE_SLEEP
+	DBUS_STATE_SLEEP,
+	DBUS_STATE_DL_NEEDED
 };
 
 enum dbus_pnp_state {
@@ -113,10 +138,10 @@ enum dbus_file {
 
 typedef enum _DEVICE_SPEED {
 	INVALID_SPEED = -1,
-	LOW_SPEED     =  1,	/* USB 1.1: 1.5 Mbps */
-	FULL_SPEED,     	/* USB 1.1: 12  Mbps */
-	HIGH_SPEED,		/* USB 2.0: 480 Mbps */
-	SUPER_SPEED,		/* USB 3.0: 4.8 Gbps */
+	LOW_SPEED     =  1,	/**< USB 1.1: 1.5 Mbps */
+	FULL_SPEED,     	/**< USB 1.1: 12  Mbps */
+	HIGH_SPEED,		/**< USB 2.0: 480 Mbps */
+	SUPER_SPEED,		/**< USB 3.0: 4.8 Gbps */
 } DEVICE_SPEED;
 
 typedef struct {
@@ -124,9 +149,9 @@ typedef struct {
 	int vid;
 	int pid;
 	int devid;
-	int chiprev; /* chip revsion number */
+	int chiprev; /**< chip revsion number */
 	int mtu;
-	int nchan; /* Data Channels */
+	int nchan; /**< Data Channels */
 	int has_2nd_bulk_in_ep;
 } dbus_attrib_t;
 
@@ -140,27 +165,30 @@ typedef struct {
 	uint32 tx_dropped;
 } dbus_stats_t;
 
-/*
+/**
  * Configurable BUS parameters
  */
 enum {
 	DBUS_CONFIG_ID_RXCTL_DEFERRES = 1,
-	DBUS_CONFIG_ID_TXRXQUEUE
+	DBUS_CONFIG_ID_AGGR_LIMIT,
+	DBUS_CONFIG_ID_KEEPIF_ON_DEVRESET
 };
+
 typedef struct {
 	uint32 config_id;
 	union {
+		uint32 general_param;
 		bool rxctl_deferrespok;
 		struct {
-			int maxrxq;
-			int rxbufsize;
-			int maxtxq;
-			int txbufsize;
-		} txrxqueue;
+			int maxrxsf;
+			int maxrxsize;
+			int maxtxsf;
+			int maxtxsize;
+		} aggr_param;
 	};
 } dbus_config_t;
 
-/*
+/**
  * External Download Info
  */
 typedef struct dbus_extdl {
@@ -173,11 +201,12 @@ typedef struct dbus_extdl {
 struct dbus_callbacks;
 struct exec_parms;
 
-typedef void *(*probe_cb_t)(void *arg, const char *desc, uint32 bustype, uint32 hdrlen);
+typedef void *(*probe_cb_t)(void *arg, const char *desc, uint32 bustype,
+	uint16 bus_no, uint16 slot, uint32 hdrlen);
 typedef void (*disconnect_cb_t)(void *arg);
 typedef void *(*exec_cb_t)(struct exec_parms *args);
 
-/* Client callbacks registered during dbus_attach() */
+/** Client callbacks registered during dbus_attach() */
 typedef struct dbus_callbacks {
 	void (*send_complete)(void *cbarg, void *info, int status);
 	void (*recv_buf)(void *cbarg, uint8 *buf, int len);
@@ -229,7 +258,7 @@ typedef struct {
 	int  (*get_config)(void *bus, dbus_config_t *config);
 
 	bool (*device_exists)(void *bus);
-	bool (*dlneeded)(void *bus);
+	int (*dlneeded)(void *bus);
 	int  (*dlstart)(void *bus, uint8 *fw, int len);
 	int  (*dlrun)(void *bus);
 	bool (*recv_needed)(void *bus);
@@ -267,7 +296,7 @@ typedef struct dbus_pub {
 	int ntxq, nrxq, rxsize;
 	void *bus;
 	struct shared_info *sh;
-    void *dev_info;
+	void *dev_info;
 } dbus_pub_t;
 
 #define BUS_INFO(bus, type) (((type *) bus)->pub->bus)
@@ -291,25 +320,21 @@ extern int dbus_register(int vid, int pid, probe_cb_t prcb, disconnect_cb_t disc
 	void *param1, void *param2);
 extern int dbus_deregister(void);
 
-extern dbus_pub_t *dbus_attach(struct osl_info *osh, int rxsize, int nrxq, int ntxq,
-	void *cbarg, dbus_callbacks_t *cbs, dbus_extdl_t *extdl, struct shared_info *sh);
-extern void dbus_detach(dbus_pub_t *pub);
-
-extern int dbus_up(dbus_pub_t *pub);
+//extern int dbus_download_firmware(dbus_pub_t *pub);
+//extern int dbus_up(struct dhd_bus *pub);
 extern int dbus_down(dbus_pub_t *pub);
-extern int dbus_stop(dbus_pub_t *pub);
+//extern int dbus_stop(struct dhd_bus *pub);
 extern int dbus_shutdown(dbus_pub_t *pub);
 extern void dbus_flowctrl_rx(dbus_pub_t *pub, bool on);
 
 extern int dbus_send_txdata(dbus_pub_t *dbus, void *pktbuf);
 extern int dbus_send_buf(dbus_pub_t *pub, uint8 *buf, int len, void *info);
 extern int dbus_send_pkt(dbus_pub_t *pub, void *pkt, void *info);
-extern int dbus_send_ctl(dbus_pub_t *pub, uint8 *buf, int len);
-extern int dbus_recv_ctl(dbus_pub_t *pub, uint8 *buf, int len);
+//extern int dbus_send_ctl(struct dhd_bus *pub, uint8 *buf, int len);
+//extern int dbus_recv_ctl(struct dhd_bus *pub, uint8 *buf, int len);
 extern int dbus_recv_bulk(dbus_pub_t *pub, uint32 ep_idx);
 extern int dbus_poll_intr(dbus_pub_t *pub);
 extern int dbus_get_stats(dbus_pub_t *pub, dbus_stats_t *stats);
-extern int dbus_get_attrib(dbus_pub_t *pub, dbus_attrib_t *attrib);
 extern int dbus_get_device_speed(dbus_pub_t *pub);
 extern int dbus_set_config(dbus_pub_t *pub, dbus_config_t *config);
 extern int dbus_get_config(dbus_pub_t *pub, dbus_config_t *config);
@@ -323,8 +348,11 @@ extern int dbus_pnp_sleep(dbus_pub_t *pub);
 extern int dbus_pnp_resume(dbus_pub_t *pub, int *fw_reload);
 extern int dbus_pnp_disconnect(dbus_pub_t *pub);
 
-extern int dbus_iovar_op(dbus_pub_t *pub, const char *name,
-	void *params, int plen, void *arg, int len, bool set);
+//extern int dbus_iovar_op(dbus_pub_t *pub, const char *name,
+//	void *params, int plen, void *arg, int len, bool set);
+#ifdef BCMDBG
+extern void dbus_hist_dump(dbus_pub_t *pub, struct bcmstrbuf *b);
+#endif /* BCMDBG */
 
 extern void *dhd_dbus_txq(const dbus_pub_t *pub);
 extern uint dhd_dbus_hdrlen(const dbus_pub_t *pub);
@@ -333,9 +361,9 @@ extern uint dhd_dbus_hdrlen(const dbus_pub_t *pub);
  * Private Common Bus Interface
  */
 
-/* IO Request Block (IRB) */
+/** IO Request Block (IRB) */
 typedef struct dbus_irb {
-	struct dbus_irb *next;	/* it's casted from dbus_irb_tx or dbus_irb_rx struct */
+	struct dbus_irb *next;	/**< it's casted from dbus_irb_tx or dbus_irb_rx struct */
 } dbus_irb_t;
 
 typedef struct dbus_irb_rx {
@@ -349,17 +377,18 @@ typedef struct dbus_irb_rx {
 } dbus_irb_rx_t;
 
 typedef struct dbus_irb_tx {
-	struct dbus_irb irb; /* Must be first */
-	uint8 *buf;
-	int len;
-	void *pkt;
+	struct dbus_irb irb; 	/** Must be first */
+	uint8 *buf;		/** mutually exclusive with struct member 'pkt' */
+	int len;		/** length of field 'buf' */
+	void *pkt;		/** mutually exclusive with struct member 'buf' */
 	int retry_count;
 	void *info;
 	void *arg;
-	void *send_buf; /* linear  bufffer for LINUX when aggreagtion is enabled */
+	void *send_buf;		/**< linear  bufffer for LINUX when aggreagtion is enabled */
 } dbus_irb_tx_t;
 
-/* DBUS interface callbacks are different from user callbacks
+/**
+ * DBUS interface callbacks are different from user callbacks
  * so, internally, different info can be passed to upper layer
  */
 typedef struct dbus_intf_callbacks {
@@ -409,14 +438,29 @@ extern int dbus_bus_osl_hw_deregister(void);
 
 extern uint usbdev_bulkin_eps(void);
 #if defined(BCM_REQUEST_FW)
-extern void *dbus_get_fw_nvfile(int devid, uint8 **fw, int *fwlen, int type,
+extern void *dbus_get_fw_nvfile(int devid, int chiprev, uint8 **fw, int *fwlen, int type,
   uint16 boardtype, uint16 boardrev);
 extern void dbus_release_fw_nvfile(void *firmware);
 #endif  /* #if defined(BCM_REQUEST_FW) */
 
-
 #if defined(EHCI_FASTPATH_TX) || defined(EHCI_FASTPATH_RX)
+/*
+ * Include file for the ECHI fastpath optimized USB
+ * Practically all the lines below have equivalent in some structures in other include (or even
+ * source) files This violates all kind of structure and layering, but cutting through layers is
+ * what the optimization is about. The definitions are NOT literally borrowed from any GPLd code;
+ * the file is intended to be GPL-clean
+ *
+ * Note that while some resemblance between this code and GPLd code in Linux might exist, it is
+ * due to the common sibling. See FreeBSD: head/sys/dev/usb/controller/ehci.h for the source of
+ * inspiration :-)
+ *
+ * The code assumes little endian throughout
+ */
 
+#if !defined(__linux__)
+#error "EHCI fastpath is for Linux only."
+#endif
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 0))
 	/* Backward compatibility */
@@ -483,21 +527,22 @@ struct ehci_qtd {
 	volatile uint32_t 	qtd_buffer_hi[EHCI_QTD_NBUFFERS];
 
 	/* Implementation extension */
-	dma_addr_t		qtd_self;		/* own hardware address */
-	struct ehci_qtd		*obj_next;		/* software link to the next QTD */
-	void			*rpc;			/* pointer to the rpc buffer */
-	size_t			length;			/* length of the data in the buffer */
-	void			*buff;			/* pointer to the reassembly buffer */
-	int			xacterrs;		/* retry counter for qtd xact error */
+	dma_addr_t		qtd_self;		/**< own hardware address */
+	struct ehci_qtd		*obj_next;		/**< software link to the next QTD */
+	void			*rpc;			/**< pointer to the rpc buffer */
+	size_t			length;			/**< length of the data in the buffer */
+	void			*buff;			/**< pointer to the reassembly buffer */
+	int			xacterrs;		/**< retry counter for qtd xact error */
 } __attribute__ ((aligned(EHCI_QTD_ALIGN)));
 
 #define	EHCI_NULL	__constant_cpu_to_le32(1) /* HW null pointer shall be odd */
 
 #define SHORT_READ_Q(token) (EHCI_QTD_GET_BYTES(token) != 0 && EHCI_QTD_GET_PID(token) == 1)
 
-/* Queue Head */
-/* NOTE This structure is slightly different from the one in the kernel; but needs to stay
- * compatible
+/**
+ * Queue Head
+ * NOTE This structure is slightly different from the one in the kernel; but needs to stay
+ * compatible.
  */
 struct ehci_qh {
 	/* Hardware map */
@@ -557,7 +602,7 @@ struct ehci_qh {
 } __attribute__ ((aligned(EHCI_QTD_ALIGN)));
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 0))
-/* The corresponding structure in the kernel is used to get the QH */
+/** The corresponding structure in the kernel is used to get the QH */
 struct hcd_dev {	/* usb_device.hcpriv points to this */
 	struct list_head	unused0;
 	struct list_head	unused1;

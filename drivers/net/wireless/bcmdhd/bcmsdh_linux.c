@@ -1,14 +1,14 @@
 /*
  * SDIO access interface for drivers - linux specific (pci only)
  *
- * Copyright (C) 1999-2016, Broadcom Corporation
- * 
+ * Copyright (C) 2020, Broadcom.
+ *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
  * under the terms of the GNU General Public License version 2 (the "GPL"),
  * available at http://www.broadcom.com/licenses/GPLv2.php, with the
  * following added to such license:
- * 
+ *
  *      As a special exception, the copyright holders of this software give you
  * permission to link this software with independent modules, and to copy and
  * distribute the resulting executable under terms of your choice, provided that
@@ -16,12 +16,11 @@
  * the license of that module.  An independent module is a module which is not
  * derived from this software.  The special exception does not apply to any
  * modifications of the software.
- * 
- *      Notwithstanding the above, under no circumstances may you combine this
- * software in any way with any other Broadcom software provided under a license
- * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmsdh_linux.c 662739 2016-11-08 09:20:31Z $
+ *
+ * <<Broadcom-WL-IPTag/Open:>>
+ *
+ * $Id$
  */
 
 /**
@@ -47,7 +46,6 @@ extern void dhdsdio_isr(void * args);
 #if defined(CONFIG_ARCH_ODIN)
 #include <linux/platform_data/gpio-odin.h>
 #endif /* defined(CONFIG_ARCH_ODIN) */
-
 #include <dhd_linux.h>
 
 /* driver info, initialized when bcmsdh_register is called */
@@ -82,7 +80,13 @@ typedef struct bcmsdh_os_info {
 } bcmsdh_os_info_t;
 
 /* debugging macros */
-#define SDLX_MSG(x)
+#ifdef BCMDBG_ERR
+#define SDLX_ERR(x) printf x
+#define SDLX_MSG(x)	printf x
+#else
+#define SDLX_ERR(x) printf x
+#define SDLX_MSG(x)	printf x
+#endif /* BCMDBG_ERR */
 
 /**
  * Checks to see if vendor and device IDs match a supported SDIO Host Controller.
@@ -91,6 +95,23 @@ bool
 bcmsdh_chipmatch(uint16 vendor, uint16 device)
 {
 	/* Add other vendors and devices as required */
+#ifdef BCMINTERNAL
+#ifdef BCMSDIOH_BCM
+	if (device == SDIOH_FPGA_ID && vendor == VENDOR_BROADCOM) {
+		return (TRUE);
+	}
+	if (device == BCM_SDIOH_ID && vendor == VENDOR_BROADCOM) {
+		return (TRUE);
+	}
+	if (device == BCM4710_DEVICE_ID && vendor == VENDOR_BROADCOM) {
+		return (TRUE);
+	}
+	/* For now still accept the old devid */
+	if (device == 0x4380 && vendor == VENDOR_BROADCOM) {
+		return (TRUE);
+	}
+#endif /* BCMSDIOH_BCM */
+#endif /* BCMINTERNAL */
 
 #ifdef BCMSDIOH_STD
 	/* Check for Arasan host controller */
@@ -121,6 +142,12 @@ bcmsdh_chipmatch(uint16 vendor, uint16 device)
 		return (TRUE);
 	}
 
+#ifdef BCMINTERNAL
+	/* Check for Jinvani (C-Guys) host controller */
+	if (device == JINVANI_SDIOH_ID && vendor == VENDOR_JINVANI) {
+		return (TRUE);
+	}
+#endif /* BCMINTERNAL */
 #endif /* BCMSDIOH_STD */
 #ifdef BCMSDIOH_SPI
 	/* This is the PciSpiHost. */
@@ -129,8 +156,28 @@ bcmsdh_chipmatch(uint16 vendor, uint16 device)
 		return (TRUE);
 	}
 
+#ifdef BCMINTERNAL
+	/* This is the SPI Host for QT. */
+	if (device == BCM_SPIH_ID && vendor == VENDOR_BROADCOM) {
+		printf("Found SPI Host Controller\n");
+		return (TRUE);
+	}
+#endif /* BCMINTERNAL */
 #endif /* BCMSDIOH_SPI */
 
+#ifdef BCMINTERNAL
+	/*
+	 * XXX - This is a hack to get the GPL SdioLinux driver to load on Arasan/x86
+	 * This is accomplished by installing a PciSpiHost into the system alongside the
+	 * Arasan controller.  The PciSpiHost is just used to get BCMSDH loaded.
+	 */
+#ifdef BCMSDH_FD
+	if (device == SPIH_FPGA_ID && vendor == VENDOR_BROADCOM) {
+		printf("Found SdioLinux Host Controller\n");
+		return (TRUE);
+	}
+#endif /* BCMSDH_FD */
+#endif /* BCMINTERNAL */
 	return (FALSE);
 }
 
@@ -141,18 +188,15 @@ void* bcmsdh_probe(osl_t *osh, void *dev, void *sdioh, void *adapter_info, uint 
 	bcmsdh_info_t *bcmsdh;
 	uint32 vendevid;
 	bcmsdh_os_info_t *bcmsdh_osinfo = NULL;
-#ifdef OOB_PARAM
-	wifi_adapter_info_t *adapter = (wifi_adapter_info_t *)adapter_info;
-#endif /* OOB_PARAM */
 
 	bcmsdh = bcmsdh_attach(osh, sdioh, &regs);
 	if (bcmsdh == NULL) {
-		SDLX_MSG(("%s: bcmsdh_attach failed\n", __FUNCTION__));
+		SDLX_ERR(("%s: bcmsdh_attach failed\n", __FUNCTION__));
 		goto err;
 	}
 	bcmsdh_osinfo = MALLOC(osh, sizeof(bcmsdh_os_info_t));
 	if (bcmsdh_osinfo == NULL) {
-		SDLX_MSG(("%s: failed to allocate bcmsdh_os_info_t\n", __FUNCTION__));
+		SDLX_ERR(("%s: failed to allocate bcmsdh_os_info_t\n", __FUNCTION__));
 		goto err;
 	}
 	bzero((char *)bcmsdh_osinfo, sizeof(bcmsdh_os_info_t));
@@ -167,17 +211,15 @@ void* bcmsdh_probe(osl_t *osh, void *dev, void *sdioh, void *adapter_info, uint 
 #endif /* !defined(CONFIG_HAS_WAKELOCK) && (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 36)) */
 
 #if defined(OOB_INTR_ONLY)
-	OOB_PARAM_IF(!(adapter->oob_disable)) {
-		spin_lock_init(&bcmsdh_osinfo->oob_irq_spinlock);
-		/* Get customer specific OOB IRQ parametres: IRQ number as IRQ type */
-		bcmsdh_osinfo->oob_irq_num = wifi_platform_get_irq_number(adapter_info,
-			&bcmsdh_osinfo->oob_irq_flags);
-		if  (bcmsdh_osinfo->oob_irq_num < 0) {
-			SDLX_MSG(("%s: Host OOB irq is not defined\n", __FUNCTION__));
-			goto err;
-		}
+	spin_lock_init(&bcmsdh_osinfo->oob_irq_spinlock);
+	/* Get customer specific OOB IRQ parametres: IRQ number as IRQ type */
+	bcmsdh_osinfo->oob_irq_num = wifi_platform_get_irq_number(adapter_info,
+		&bcmsdh_osinfo->oob_irq_flags);
+	if  (bcmsdh_osinfo->oob_irq_num < 0) {
+		SDLX_ERR(("%s: Host OOB irq is not defined\n", __FUNCTION__));
+		goto err;
 	}
-#endif /* defined(OOB_INTR_ONLY) */
+#endif /* defined(BCMLXSDMMC) */
 
 	/* Read the vendor/device ID from the CIS */
 	vendevid = bcmsdh_query_device(bcmsdh);
@@ -185,7 +227,7 @@ void* bcmsdh_probe(osl_t *osh, void *dev, void *sdioh, void *adapter_info, uint 
 	bcmsdh_osinfo->context = drvinfo.probe((vendevid >> 16), (vendevid & 0xFFFF), bus_num,
 		slot_num, 0, bus_type, (void *)regs, osh, bcmsdh);
 	if (bcmsdh_osinfo->context == NULL) {
-		SDLX_MSG(("%s: device attach failed\n", __FUNCTION__));
+		SDLX_ERR(("%s: device attach failed\n", __FUNCTION__));
 		goto err;
 	}
 
@@ -216,6 +258,33 @@ int bcmsdh_remove(bcmsdh_info_t *bcmsdh)
 
 	return 0;
 }
+
+#ifdef DHD_WAKE_STATUS
+int bcmsdh_get_total_wake(bcmsdh_info_t *bcmsdh)
+{
+	return bcmsdh->total_wake_count;
+}
+
+int bcmsdh_set_get_wake(bcmsdh_info_t *bcmsdh, int flag)
+{
+#if defined(OOB_INTR_ONLY)
+	bcmsdh_os_info_t *bcmsdh_osinfo = bcmsdh->os_cxt;
+	unsigned long flags;
+#endif
+	int ret = 0;
+
+#if defined(OOB_INTR_ONLY)
+	spin_lock_irqsave(&bcmsdh_osinfo->oob_irq_spinlock, flags);
+
+	ret = bcmsdh->pkt_wake;
+	bcmsdh->total_wake_count += flag;
+	bcmsdh->pkt_wake = flag;
+
+	spin_unlock_irqrestore(&bcmsdh_osinfo->oob_irq_spinlock, flags);
+#endif
+	return ret;
+}
+#endif /* DHD_WAKE_STATUS */
 
 int bcmsdh_suspend(bcmsdh_info_t *bcmsdh)
 {
@@ -261,7 +330,7 @@ bcmsdh_register(bcmsdh_driver_t *driver)
 	SDLX_MSG(("%s: register client driver\n", __FUNCTION__));
 	error = bcmsdh_register_client_driver();
 	if (error)
-		SDLX_MSG(("%s: failed %d\n", __FUNCTION__, error));
+		SDLX_ERR(("%s: failed %d\n", __FUNCTION__, error));
 
 	return error;
 }
@@ -300,7 +369,14 @@ bool bcmsdh_dev_pm_enabled(bcmsdh_info_t *bcmsdh)
 	return bcmsdh_osinfo->dev_wake_enabled;
 }
 
-#if defined(OOB_INTR_ONLY)
+#if defined(OOB_INTR_ONLY) || defined(BCMSPI_ANDROID)
+int bcmsdh_get_oob_intr_num(bcmsdh_info_t *bcmsdh)
+{
+	bcmsdh_os_info_t *bcmsdh_osinfo = bcmsdh->os_cxt;
+
+	return bcmsdh_osinfo->oob_irq_num;
+}
+
 void bcmsdh_oob_intr_set(bcmsdh_info_t *bcmsdh, bool enable)
 {
 	unsigned long flags;
@@ -321,13 +397,26 @@ void bcmsdh_oob_intr_set(bcmsdh_info_t *bcmsdh, bool enable)
 	spin_unlock_irqrestore(&bcmsdh_osinfo->oob_irq_spinlock, flags);
 }
 
+#ifdef ENABLE_WAKEUP_PKT_DUMP
+extern volatile bool dhd_mmc_suspend;
+extern volatile bool dhd_mmc_wake;
+#endif /* ENABLE_WAKEUP_PKT_DUMP */
+
 static irqreturn_t wlan_oob_irq(int irq, void *dev_id)
 {
 	bcmsdh_info_t *bcmsdh = (bcmsdh_info_t *)dev_id;
 	bcmsdh_os_info_t *bcmsdh_osinfo = bcmsdh->os_cxt;
 
+#ifndef BCMSPI_ANDROID
 	bcmsdh_oob_intr_set(bcmsdh, FALSE);
+#endif /* !BCMSPI_ANDROID */
 	bcmsdh_osinfo->oob_irq_handler(bcmsdh_osinfo->oob_irq_handler_context);
+
+#ifdef ENABLE_WAKEUP_PKT_DUMP
+	if (dhd_mmc_suspend) {
+		dhd_mmc_wake = TRUE;
+	}
+#endif /* ENABLE_WAKEUP_PKT_DUMP */
 
 	return IRQ_HANDLED;
 }
@@ -338,13 +427,17 @@ int bcmsdh_oob_intr_register(bcmsdh_info_t *bcmsdh, bcmsdh_cb_fn_t oob_irq_handl
 	int err = 0;
 	bcmsdh_os_info_t *bcmsdh_osinfo = bcmsdh->os_cxt;
 
-	SDLX_MSG(("%s: Enter\n", __FUNCTION__));
 	if (bcmsdh_osinfo->oob_irq_registered) {
-		SDLX_MSG(("%s: irq is already registered\n", __FUNCTION__));
+		SDLX_ERR(("%s: irq is already registered\n", __FUNCTION__));
 		return -EBUSY;
 	}
-	SDLX_MSG(("%s OOB irq=%d flags=%X \n", __FUNCTION__,
+#ifdef HW_OOB
+	SDLX_MSG(("%s: HW_OOB irq=%d flags=0x%X\n", __FUNCTION__,
 		(int)bcmsdh_osinfo->oob_irq_num, (int)bcmsdh_osinfo->oob_irq_flags));
+#else
+	SDLX_MSG(("%s: SW_OOB irq=%d flags=0x%X\n", __FUNCTION__,
+		(int)bcmsdh_osinfo->oob_irq_num, (int)bcmsdh_osinfo->oob_irq_flags));
+#endif
 	bcmsdh_osinfo->oob_irq_handler = oob_irq_handler;
 	bcmsdh_osinfo->oob_irq_handler_context = oob_irq_handler_context;
 	bcmsdh_osinfo->oob_irq_enabled = TRUE;
@@ -357,16 +450,30 @@ int bcmsdh_oob_intr_register(bcmsdh_info_t *bcmsdh, bcmsdh_cb_fn_t oob_irq_handl
 		bcmsdh_osinfo->oob_irq_flags, "bcmsdh_sdmmc", bcmsdh);
 #endif /* defined(CONFIG_ARCH_ODIN) */
 	if (err) {
-		SDLX_MSG(("%s: request_irq failed with %d\n", __FUNCTION__, err));
+		SDLX_ERR(("%s: request_irq failed with %d\n", __FUNCTION__, err));
 		bcmsdh_osinfo->oob_irq_enabled = FALSE;
 		bcmsdh_osinfo->oob_irq_registered = FALSE;
 		return err;
 	}
 
+#if defined(DISABLE_WOWLAN)
+	SDLX_MSG(("%s: disable_irq_wake\n", __FUNCTION__));
+	bcmsdh_osinfo->oob_irq_wake_enabled = FALSE;
+#else
+#if defined(CONFIG_ARCH_RHEA) || defined(CONFIG_ARCH_CAPRI)
+	if (device_may_wakeup(bcmsdh_osinfo->dev)) {
+#endif /* CONFIG_ARCH_RHEA || CONFIG_ARCH_CAPRI */
 		err = enable_irq_wake(bcmsdh_osinfo->oob_irq_num);
-		if (!err)
+		if (err)
+			SDLX_ERR(("%s: enable_irq_wake failed with %d\n", __FUNCTION__, err));
+		else
 			bcmsdh_osinfo->oob_irq_wake_enabled = TRUE;
-	return err;
+#if defined(CONFIG_ARCH_RHEA) || defined(CONFIG_ARCH_CAPRI)
+	}
+#endif /* CONFIG_ARCH_RHEA || CONFIG_ARCH_CAPRI */
+#endif
+
+	return 0;
 }
 
 void bcmsdh_oob_intr_unregister(bcmsdh_info_t *bcmsdh)
@@ -380,9 +487,15 @@ void bcmsdh_oob_intr_unregister(bcmsdh_info_t *bcmsdh)
 		return;
 	}
 	if (bcmsdh_osinfo->oob_irq_wake_enabled) {
+#if defined(CONFIG_ARCH_RHEA) || defined(CONFIG_ARCH_CAPRI)
+		if (device_may_wakeup(bcmsdh_osinfo->dev)) {
+#endif /* CONFIG_ARCH_RHEA || CONFIG_ARCH_CAPRI */
 			err = disable_irq_wake(bcmsdh_osinfo->oob_irq_num);
 			if (!err)
 				bcmsdh_osinfo->oob_irq_wake_enabled = FALSE;
+#if defined(CONFIG_ARCH_RHEA) || defined(CONFIG_ARCH_CAPRI)
+		}
+#endif /* CONFIG_ARCH_RHEA || CONFIG_ARCH_CAPRI */
 	}
 	if (bcmsdh_osinfo->oob_irq_enabled) {
 		disable_irq(bcmsdh_osinfo->oob_irq_num);
@@ -391,9 +504,10 @@ void bcmsdh_oob_intr_unregister(bcmsdh_info_t *bcmsdh)
 	free_irq(bcmsdh_osinfo->oob_irq_num, bcmsdh);
 	bcmsdh_osinfo->oob_irq_registered = FALSE;
 }
-#endif 
+#endif /* defined(OOB_INTR_ONLY) || defined(BCMSPI_ANDROID) */
 
 /* Module parameters specific to each host-controller driver */
+/* XXX Need to move these to where they really belong! */
 
 extern uint sd_msglevel;	/* Debug message level */
 module_param(sd_msglevel, uint, 0);
@@ -415,6 +529,9 @@ module_param(sd_hiok, uint, 0);
 
 extern uint sd_f2_blocksize;
 module_param(sd_f2_blocksize, int, 0);
+
+extern uint sd_f1_blocksize;
+module_param(sd_f1_blocksize, int, 0);
 
 #ifdef BCMSDIOH_STD
 extern int sd_uhsimode;
@@ -439,9 +556,13 @@ EXPORT_SYMBOL(bcmsdh_intr_disable);
 EXPORT_SYMBOL(bcmsdh_intr_reg);
 EXPORT_SYMBOL(bcmsdh_intr_dereg);
 
-#if defined(DHD_DEBUG)
+#if defined(DHD_DEBUG) || defined(BCMDBG)
 EXPORT_SYMBOL(bcmsdh_intr_pending);
 #endif
+
+#if defined (BT_OVER_SDIO)
+EXPORT_SYMBOL(bcmsdh_btsdio_interface_init);
+#endif /* defined (BT_OVER_SDIO) */
 
 EXPORT_SYMBOL(bcmsdh_devremove_reg);
 EXPORT_SYMBOL(bcmsdh_cfg_read);
