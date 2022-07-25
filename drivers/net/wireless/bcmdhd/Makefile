@@ -43,6 +43,8 @@ DHDCFLAGS = -Wall -Wstrict-prototypes -Wno-date-time                      \
 	-DWL_EXT_IAPSTA -DWL_ESCAN -DCCODE_LIST                               \
 	-DENABLE_INSMOD_NO_FW_LOAD
 
+DHDCFLAGS += -DBCM_USE_PLATFORM_STRLCPY
+
 #SparkLAN - include path modificaiton
 ifeq ($(CONFIG_OUT_OF_KERNEL),y)
 DHDCFLAGS += -DCONFIG_SparkLAN_PATH
