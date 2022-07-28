@@ -302,7 +302,7 @@ CONFIG_RFKILL_INPUT=y
 CONFIG_DEVTMPFS=y
 CONFIG_DEVTMPFS_MOUNT=y
 # CONFIG_STANDALONE is not set
-CONFIG_EXTRA_FIRMWARE="ar3k/AthrBT_0x11020000.dfu ar3k/ramps_0x11020000_40.dfu ar3k/AthrBT_0x11020100.dfu ar3k/ramps_0x11020100_40.dfu ti-connectivity/wl18xx-fw-4.bin ti-connectivity/TIInit_11.8.32.bts"
+CONFIG_EXTRA_FIRMWARE="ar3k/AthrBT_0x11020000.dfu ar3k/ramps_0x11020000_40.dfu ar3k/AthrBT_0x11020100.dfu ar3k/ramps_0x11020100_40.dfu ti-connectivity/wl18xx-fw-4.bin ti-connectivity/TIInit_11.8.32.bts bcmdhd/clm_bcm43752a2_pcie_ag.blob bcmdhd/fw_bcm43752a2_pcie_ag_apsta.bin bcmdhd/nvram_ap6275p_mp.txt"
 CONFIG_EXTRA_FIRMWARE_DIR="/lib/firmware"
 # CONFIG_FW_LOADER_USER_HELPER_FALLBACK is not set
 CONFIG_DMA_CMA=y
