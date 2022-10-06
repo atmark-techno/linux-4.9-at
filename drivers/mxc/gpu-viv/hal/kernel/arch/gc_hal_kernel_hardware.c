@@ -10689,8 +10689,7 @@ gckHARDWARE_QueryContextNewProfile(
      * was already acquired. The context is converted to a pointer so even if
      * user-space supplies another context would be transformed to a NULL value.
      */
-    if ((Context == NULL) || (&Context->histroyNewProfiler_part1 == NULL) ||
-	(&Context->histroyNewProfiler_part2 == NULL)) {
+    if (!Context) {
     	gcmkONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
