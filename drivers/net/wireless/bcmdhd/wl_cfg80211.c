@@ -17254,12 +17254,10 @@ s32 wl_cfg80211_up(struct net_device *net)
 	mutex_lock(&cfg->usr_sync);
 #if defined(BCMDONGLEHOST)
 	dhd = (dhd_pub_t *)(cfg->pub);
-	if (!(dhd->op_mode & DHD_FLAG_HOSTAP_MODE)) {
-		err = wl_cfg80211_attach_post(bcmcfg_to_prmry_ndev(cfg));
-		if (unlikely(err)) {
-			mutex_unlock(&cfg->usr_sync);
-			return err;
-		}
+	err = wl_cfg80211_attach_post(bcmcfg_to_prmry_ndev(cfg));
+	if (unlikely(err)) {
+		mutex_unlock(&cfg->usr_sync);
+		return err;
 	}
 #ifdef WLMESH_CFG80211
 	cfg->wdev->wiphy->features |= NL80211_FEATURE_USERSPACE_MPM;
