@@ -54,6 +54,9 @@
 #ifdef DHD_BUZZZ_LOG_ENABLED
 #include <dhd_buzzz.h>
 #endif /* DHD_BUZZZ_LOG_ENABLED */
+#ifdef DHD_USE_FIRMWARE_CLASS
+#include <linux/firmware.h>
+#endif /* DHD_USE_FIRMWARE_CLASS */
 /* The kernel threading is sdio-specific */
 struct task_struct;
 struct sched_param;
@@ -1947,6 +1950,13 @@ typedef struct dhd_pub {
 	void *zconf;
 #endif
 } dhd_pub_t;
+
+#ifdef DHD_USE_FIRMWARE_CLASS
+typedef struct dhd_fw {
+	const struct firmware *fw;
+	loff_t fw_pos;
+} dhd_fw_t;
+#endif
 
 #if defined(__linux__)
 int dhd_wifi_platform_set_power(dhd_pub_t *pub, bool on);

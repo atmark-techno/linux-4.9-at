@@ -10507,12 +10507,20 @@ dhd_os_read_file(void *file, char *buf, uint32 size)
 int
 dhd_os_seek_file(void *file, int64 offset)
 {
+#ifndef DHD_USE_FIRMWARE_CLASS
 	struct file *filep = (struct file *)file;
 	if (!file)
 		return -1;
 
 	/* offset can be -ve */
 	filep->f_pos = filep->f_pos + offset;
+#else
+	dhd_fw_t *fp = (dhd_fw_t *)file;
+	if (!fp || !fp->fw)
+		return -1;
+
+	fp->fw_pos = fp->fw_pos + offset;
+#endif
 
 	return 0;
 }
@@ -17992,6 +18000,7 @@ exit:
 void *
 dhd_os_open_image1(dhd_pub_t *pub, char *filename)
 {
+#ifndef DHD_USE_FIRMWARE_CLASS
 	struct file *fp;
 	int size;
 
@@ -18021,6 +18030,24 @@ dhd_os_open_image1(dhd_pub_t *pub, char *filename)
 	 }
 
 	 DHD_ERROR(("%s: %s (%d bytes) open success\n", __FUNCTION__, filename, size));
+#else
+	 dhd_fw_t *fp;
+
+	 fp = MALLOCZ(pub->osh, sizeof(dhd_fw_t));
+	 if (unlikely(!fp)) {
+		 DHD_ERROR(("%s: MALLOC failure, %d bytes\n", __FUNCTION__, sizeof(dhd_fw_t)));
+		 goto err;
+	 }
+
+	 if (request_firmware(&fp->fw, filename, dhd_bus_to_dev(pub->bus)) < 0) {
+		 DHD_ERROR(("%s : failed to load %s\n", __FUNCTION__, filename));
+		 MFREE(pub->osh, fp, sizeof(dhd_fw_t));
+		 fp = NULL;
+		 goto err;
+	 }
+
+	 DHD_ERROR(("%s: %s (%d bytes) open success\n", __FUNCTION__, filename, fp->fw->size));
+#endif
 
 err:
 	 return fp;
@@ -18029,6 +18056,7 @@ err:
 int
 dhd_os_get_image_block(char *buf, int len, void *image)
 {
+#ifndef DHD_USE_FIRMWARE_CLASS
 	struct file *fp = (struct file *)image;
 	int rdlen;
 	int size;
@@ -18047,6 +18075,26 @@ dhd_os_get_image_block(char *buf, int len, void *image)
 	if (rdlen > 0) {
 		fp->f_pos += rdlen;
 	}
+#else
+	dhd_fw_t *fp = (dhd_fw_t *)image;
+	int rdlen;
+	int size;
+
+	if (!fp || !fp->fw) {
+		return 0;
+	}
+
+	if (fp->fw->size <= fp->fw_pos) {
+		return -EIO;
+	}
+	size = fp->fw->size - fp->fw_pos;
+
+	rdlen = MIN(len, size);
+	if (rdlen > 0) {
+		memcpy(buf, fp->fw->data + fp->fw_pos, rdlen);
+		fp->fw_pos += rdlen;
+	}
+#endif
 
 	return rdlen;
 }
@@ -18055,6 +18103,7 @@ dhd_os_get_image_block(char *buf, int len, void *image)
 int
 dhd_os_gets_image(dhd_pub_t *pub, char *str, int len, void *image)
 {
+#ifndef DHD_USE_FIRMWARE_CLASS
 	struct file *fp = (struct file *)image;
 	int rd_len;
 	uint str_len = 0;
@@ -18073,6 +18122,32 @@ dhd_os_gets_image(dhd_pub_t *pub, char *str, int len, void *image)
 	/* Advance file pointer past the string length */
 	fp->f_pos += str_len + 1;
 	bzero(str_end, rd_len - str_len);
+#else
+	dhd_fw_t *fp = (dhd_fw_t *)image;
+	int rd_len;
+	int size;
+	uint str_len = 0;
+	char *str_end = NULL;
+
+	if (!fp || !fp->fw)
+		return 0;
+
+	if (fp->fw->size <= fp->fw_pos) {
+		return -EIO;
+	}
+	size = fp->fw->size - fp->fw_pos;
+	rd_len = MIN(len, size);
+
+	memcpy((char *)str, fp->fw->data + fp->fw_pos, rd_len);
+	str_end = strnchr(str, len, '\n');
+	if (str_end == NULL) {
+		goto err;
+	}
+	str_len = (uint)(str_end - str);
+
+	fp->fw_pos += str_len + 1;
+	bzero(str_end, rd_len - str_len);
+#endif
 
 err:
 	return str_len;
@@ -18082,6 +18157,7 @@ err:
 int
 dhd_os_get_image_size(void *image)
 {
+#ifndef DHD_USE_FIRMWARE_CLASS
 	struct file *fp = (struct file *)image;
 	int size;
 	if (!image) {
@@ -18089,6 +18165,15 @@ dhd_os_get_image_size(void *image)
 	}
 
 	size = i_size_read(file_inode(fp));
+#else
+	dhd_fw_t *fp = (dhd_fw_t *)image;
+	int size;
+	if (!fp || !fp->fw) {
+		return 0;
+	}
+
+	size = fp->fw->size;
+#endif
 
 	return size;
 }
@@ -18097,7 +18182,13 @@ void
 dhd_os_close_image1(dhd_pub_t *pub, void *image)
 {
 	if (image) {
+#ifndef DHD_USE_FIRMWARE_CLASS
 		filp_close((struct file *)image, NULL);
+#else
+		if (((dhd_fw_t *)image)->fw)
+			release_firmware(((dhd_fw_t *)image)->fw);
+		MFREE(pub->osh, image, sizeof(dhd_fw_t));
+#endif
 	}
 }
 
