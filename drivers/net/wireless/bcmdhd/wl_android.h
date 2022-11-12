@@ -78,7 +78,7 @@ typedef struct _compat_android_wifi_priv_cmd {
 #define ANDROID_INFO_LEVEL	(1 << 2)
 #define ANDROID_SCAN_LEVEL	(1 << 3)
 #define ANDROID_DBG_LEVEL	(1 << 4)
-#define ANDROID_MSG_LEVEL	(1 << 0)
+#define ANDROID_MSG_LEVEL	(1 << 5)
 
 #define WL_MSG(name, arg1, args...) \
 	do { \

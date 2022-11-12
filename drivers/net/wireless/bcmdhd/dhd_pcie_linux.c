@@ -313,7 +313,7 @@ static int dhdpcie_smmu_init(struct pci_dev *pdev, void *smmu_cxt)
 		smmu_info->smmu_iova_start = smmu_iova_address[0];
 		smmu_info->smmu_iova_len = smmu_iova_address[1];
 	} else {
-		printf("%s : can't get smmu iova address property\n",
+		pr_err("%s : can't get smmu iova address property\n",
 			__FUNCTION__);
 		return -ENODEV;
 	}
@@ -1231,13 +1231,13 @@ static int dhdpcie_resume_dev(struct pci_dev *dev)
 #endif /* FORCE_TPOWERON */
 	err = pci_enable_device(dev);
 	if (err) {
-		printf("%s:pci_enable_device error %d \n", __FUNCTION__, err);
+		pr_err("%s:pci_enable_device error %d \n", __FUNCTION__, err);
 		goto out;
 	}
 	pci_set_master(dev);
 	err = pci_set_power_state(dev, PCI_D0);
 	if (err) {
-		printf("%s:pci_set_power_state error %d \n", __FUNCTION__, err);
+		pr_err("%s:pci_set_power_state error %d \n", __FUNCTION__, err);
 		goto out;
 	}
 	BCM_REFERENCE(pch);
@@ -1839,7 +1839,7 @@ int dhdpcie_get_resource(dhdpcie_info_t *dhdpcie_info)
 
 	do {
 		if (pci_enable_device(pdev)) {
-			printf("%s: Cannot enable PCI device\n", __FUNCTION__);
+			pr_err("%s: Cannot enable PCI device\n", __FUNCTION__);
 			break;
 		}
 		pci_set_master(pdev);
@@ -1850,7 +1850,7 @@ int dhdpcie_get_resource(dhdpcie_info_t *dhdpcie_info)
 		bar1_size = pci_resource_len(pdev, 2);
 
 		if ((bar1_size == 0) || (bar1_addr == 0)) {
-			printf("%s: BAR1 Not enabled for this device  size(%ld),"
+			pr_err("%s: BAR1 Not enabled for this device  size(%ld),"
 				" addr(0x"PRINTF_RESOURCE")\n",
 				__FUNCTION__, bar1_size, bar1_addr);
 			goto err;
@@ -2621,7 +2621,7 @@ dhdpcie_alloc_resource(dhd_bus_t *bus)
 		bar1_size = pci_resource_len(bus->dev, 2);
 
 		if ((bar1_size == 0) || (bar1_addr == 0)) {
-			printf("%s: BAR1 Not enabled for this device size(%ld),"
+			pr_err("%s: BAR1 Not enabled for this device size(%ld),"
 				" addr(0x"PRINTF_RESOURCE")\n",
 				__FUNCTION__, bar1_size, bar1_addr);
 			break;
@@ -2951,7 +2951,7 @@ int dhdpcie_oob_intr_register(dhd_bus_t *bus)
 		if (!err) {
 			dhdpcie_osinfo->oob_irq_wake_enabled = TRUE;
 		} else
-			printf("%s: enable_irq_wake failed with %d\n", __FUNCTION__, err);
+			pr_err("%s: enable_irq_wake failed with %d\n", __FUNCTION__, err);
 #endif
 		dhdpcie_osinfo->oob_irq_enabled = TRUE;
 	}

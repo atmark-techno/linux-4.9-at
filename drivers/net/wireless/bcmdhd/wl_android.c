@@ -88,7 +88,7 @@
 #define WL_BSSIDX_MAX	16
 #endif /* WL_STATIC_IF */
 
-uint android_msg_level = ANDROID_ERROR_LEVEL | ANDROID_MSG_LEVEL;
+uint android_msg_level = ANDROID_ERROR_LEVEL;
 
 #define ANDROID_ERROR_MSG(x, args...) \
 	do { \

@@ -6259,7 +6259,7 @@ dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 					*endptr = '\0';
 					rc = wl_pkt_filter_base_parse(argv[i]);
 					if (rc == -1) {
-						 printf("Invalid base %s\n", argv[i]);
+						 pr_err("Invalid base %s\n", argv[i]);
 						goto fail;
 					}
 					*endptr = ':';
@@ -6267,7 +6267,7 @@ dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 			}
 
 			if (endptr == NULL) {
-				printf("Invalid [base:]offset format: %s\n", argv[i]);
+				pr_err("Invalid [base:]offset format: %s\n", argv[i]);
 				goto fail;
 			}
 
@@ -6280,11 +6280,11 @@ dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 			}
 
 			if (*endptr) {
-				printf("Invalid [base:]offset format: %s\n", argv[i]);
+				pr_err("Invalid [base:]offset format: %s\n", argv[i]);
 				goto fail;
 			}
 			if (rc > 0x0000FFFF) {
-				printf("Offset too large\n");
+				pr_err("Offset too large\n");
 				goto fail;
 			}
 			pf_el->rel_offs = htod16(rc);
@@ -6294,18 +6294,18 @@ dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 
 			/* Parse pattern filter mask and pattern directly into ioctl buffer */
 			if (argv[++i] == NULL) {
-				printf("Bitmask not provided\n");
+				pr_err("Bitmask not provided\n");
 				goto fail;
 			}
 			rc = wl_pattern_atoh(argv[i], (char*)pf_el->mask_and_data);
 			if ((rc == -1) || (rc > MAX_PKTFLT_FIXED_PATTERN_SIZE)) {
-				printf("Rejecting: %s\n", argv[i]);
+				pr_err("Rejecting: %s\n", argv[i]);
 				goto fail;
 			}
 			mask_size = htod16(rc);
 
 			if (argv[++i] == NULL) {
-				printf("Pattern not provided\n");
+				pr_err("Pattern not provided\n");
 				goto fail;
 			}
 
@@ -6314,19 +6314,19 @@ dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 				pf_el->match_flags =
 					htod16(WL_PKT_FILTER_MFLAG_NEG);
 				if (*(++endptr) == '\0') {
-					printf("Pattern not provided\n");
+					pr_err("Pattern not provided\n");
 					goto fail;
 				}
 			}
 			rc = wl_pattern_atoh(endptr, (char*)&pf_el->mask_and_data[rc]);
 			if ((rc == -1) || (rc > MAX_PKTFLT_FIXED_PATTERN_SIZE)) {
-				printf("Rejecting: %s\n", argv[i]);
+				pr_err("Rejecting: %s\n", argv[i]);
 				goto fail;
 			}
 			pattern_size = htod16(rc);
 
 			if (mask_size != pattern_size) {
-				printf("Mask and pattern not the same size\n");
+				pr_err("Mask and pattern not the same size\n");
 				goto fail;
 			}
 
@@ -7734,7 +7734,7 @@ wl_iw_parse_channel_list(char** list_str, uint16* channel_list, int channel_num)
 	while (strncmp(str, GET_NPROBE, strlen(GET_NPROBE))) {
 		val = (int)strtoul(str, &endptr, 0);
 		if (endptr == str) {
-			printf("could not parse channel number starting at"
+			pr_err("could not parse channel number starting at"
 				" substring \"%s\" in list:\n%s\n",
 				str, *list_str);
 			return -1;
@@ -7854,7 +7854,7 @@ int dhd_get_download_buffer(dhd_pub_t	*dhd, char *file_path, download_type_t com
 		if (file_path) {
 			image = dhd_os_open_image1(dhd, file_path);
 			if (image == NULL) {
-				printf("%s: Open image file failed %s\n", __FUNCTION__, file_path);
+				pr_err("%s: Open image file failed %s\n", __FUNCTION__, file_path);
 				goto err;
 			}
 		}
@@ -8285,7 +8285,7 @@ dhd_apply_default_clm(dhd_pub_t *dhd, char *clm_path)
 #else
 	memblock = dhd_os_open_image1(dhd, (char *)clm_blob_path);
 	if (memblock == NULL) {
-		printf("%s: Ignore clm file %s\n", __FUNCTION__, clm_path);
+		pr_err("%s: Ignore clm file %s\n", __FUNCTION__, clm_path);
 #if defined(DHD_BLOB_EXISTENCE_CHECK)
 		if (dhd->is_blob) {
 			err = BCME_ERROR;

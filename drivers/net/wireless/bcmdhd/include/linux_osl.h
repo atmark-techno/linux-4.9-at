@@ -348,7 +348,7 @@ extern uint64 osl_systztime_us(void);
 #define OSL_LOCALTIME_NS()	osl_localtime_ns()
 #define OSL_GET_LOCALTIME(sec, usec)	osl_get_localtime((sec), (usec))
 #define OSL_SYSTZTIME_US()	osl_systztime_us()
-#define	printf(fmt, args...)	printk(DHD_LOG_PREFIXS fmt , ## args)
+#define	printf(fmt, args...)	pr_debug(DHD_LOG_PREFIXS fmt , ## args)
 #include <linux/kernel.h>	/* for vsn/printf's */
 #include <linux/string.h>	/* for mem*, str* */
 /* bcopy's: Linux kernel doesn't provide these (anymore) */
@@ -654,7 +654,7 @@ extern void osl_writeq(osl_t *osh, volatile uint64 *r, uint64 v);
  * agree with me).  I may be able to even remove these references eventually with
  * a GNU binutil such as objcopy via a symbol rename (i.e. memcpy to osl_memcpy).
  */
-	#define	printf(fmt, args...)	printk(fmt , ## args)
+	#define	printf(fmt, args...)	pr_debug(fmt , ## args)
 	#include <linux/kernel.h>	/* for vsn/printf's */
 	#include <linux/string.h>	/* for mem*, str* */
 	/* bcopy's: Linux kernel doesn't provide these (anymore) */
