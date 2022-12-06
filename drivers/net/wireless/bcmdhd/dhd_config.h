@@ -377,6 +377,9 @@ void dhd_conf_add_pkt_filter(dhd_pub_t *dhd);
 bool dhd_conf_del_pkt_filter(dhd_pub_t *dhd, uint32 id);
 void dhd_conf_discard_pkt_filter(dhd_pub_t *dhd);
 int dhd_conf_read_config(dhd_pub_t *dhd, char *conf_path);
+#ifdef CONFIG_OF
+void dhd_conf_read_config_dt(dhd_pub_t *dhd);
+#endif
 int dhd_conf_set_chiprev(dhd_pub_t *dhd, uint chip, uint chiprev);
 uint dhd_conf_get_chip(void *context);
 uint dhd_conf_get_chiprev(void *context);
