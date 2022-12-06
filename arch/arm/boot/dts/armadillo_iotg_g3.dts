@@ -155,6 +155,10 @@
 		compatible = "gpio-poweroff";
 		gpios = <&gpio_bmic 2 GPIO_ACTIVE_LOW>;
 	};
+
+	bcmdhd-configs {
+		ccode = "JP"; /* country code from ISO 3166 */
+	};
 };
 
 &cpu0 {
