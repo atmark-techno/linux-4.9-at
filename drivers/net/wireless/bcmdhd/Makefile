@@ -41,7 +41,7 @@ DHDCFLAGS = -Wall -Wstrict-prototypes -Wno-date-time                      \
 	-DPOWERUP_MAX_RETRY=0 -DIFACE_HANG_FORCE_DEV_CLOSE -DWAIT_DEQUEUE     \
 	-DUSE_NEW_RSPEC_DEFS                                                  \
 	-DWL_EXT_IAPSTA -DWL_ESCAN -DCCODE_LIST                               \
-	-DENABLE_INSMOD_NO_POWER_OFF -DDHD_USE_FIRMWARE_CLASS
+	-DENABLE_INSMOD_NO_POWER_OFF -DDHD_USE_FIRMWARE_CLASS -DWLWSEC
 
 DHDCFLAGS += -DBCM_USE_PLATFORM_STRLCPY
 
