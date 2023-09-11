@@ -13627,6 +13627,12 @@ static s32 wl_get_assoc_ies(struct bcm_cfg80211 *cfg, struct net_device *ndev)
 	memcpy(&assoc_info, cfg->extra_buf, sizeof(wl_assoc_info_t));
 	assoc_info.req_len = htod32(assoc_info.req_len);
 	assoc_info.resp_len = htod32(assoc_info.resp_len);
+	if (assoc_info.req_len > WL_EXTRA_BUF_MAX ||
+	    assoc_info.resp_len > WL_EXTRA_BUF_MAX) {
+		WL_ERR(("invalid lengths in assoc info: req %u resp %u\n",
+			assoc_info.req_len, assoc_info.resp_len));
+		return -EINVAL;
+	}
 	assoc_info.flags = htod32(assoc_info.flags);
 	if (conn_info->req_ie_len) {
 		conn_info->req_ie_len = 0;
