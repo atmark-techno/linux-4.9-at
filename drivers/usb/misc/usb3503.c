@@ -56,6 +56,13 @@
 #define USB3503_DN2_SQUELCH_MASK (0x7 << 4)
 #define USB3503_DN1_SQUELCH_MASK (0x7 << 0)
 
+#define USB3503_BSTUP3		0xf6
+#define USB3503_BOOST_IOUT_3_MASK (0x7 << 0)
+
+#define USB3503_BST21		0xf8
+#define USB3503_BOOST_IOUT_2_MASK (0x7 << 4)
+#define USB3503_BOOST_IOUT_1_MASK (0x7 << 0)
+
 #define USB3503_RESET		0xff
 
 struct usb3503 {
@@ -65,6 +72,8 @@ struct usb3503 {
 	struct clk		*clk;
 	u8	port_off_mask;
 	u32	varisense_21;
+	u32	boost_up3;
+	u32	boost_21;
 	int	gpio_intn;
 	int	gpio_reset;
 	int	gpio_connect;
@@ -120,6 +129,30 @@ static int usb3503_connect(struct usb3503 *hub)
 					 USB3503_SELF_BUS_PWR);
 		if (err < 0) {
 			dev_err(dev, "CFG1 failed (%d)\n", err);
+			return err;
+		}
+
+		/*
+		 * BSTUP3: signaling drive strength (Port3)
+		 * Default = 0x30h
+		 */
+		err = regmap_update_bits(hub->regmap, USB3503_BSTUP3,
+					 USB3503_BOOST_IOUT_3_MASK,
+					 hub->boost_up3);
+		if (err < 0) {
+			dev_err(dev, "BSTUP3 failed (%d)\n", err);
+			return err;
+		}
+
+		/*
+		 * BST21: signaling drive strength (Port1/2)
+		 * Default = 0x00h
+		 */
+		err = regmap_update_bits(hub->regmap, USB3503_BST21,
+					 USB3503_BOOST_IOUT_2_MASK | USB3503_BOOST_IOUT_1_MASK,
+					 hub->boost_21);
+		if (err < 0) {
+			dev_err(dev, "BST21 failed (%d)\n", err);
 			return err;
 		}
 
@@ -236,6 +269,7 @@ static int usb3503_probe(struct usb3503 *hub)
 		struct clk *clk;
 		u32 rate = 0;
 		u32 squelch;
+		u32 boost;
 		hub->port_off_mask = 0;
 
 		if (!of_property_read_u32(np, "refclk-frequency", &rate)) {
@@ -262,6 +296,12 @@ static int usb3503_probe(struct usb3503 *hub)
 
 		if (!of_property_read_u32(np, "vsns21-squelch", &squelch))
 			hub->varisense_21 = squelch;
+
+		if (!of_property_read_u32(np, "bstup3-boost-iout", &boost))
+			hub->boost_up3 = boost;
+
+		if (!of_property_read_u32(np, "bst21-boost-iout", &boost))
+			hub->boost_21 = boost;
 
 		clk = devm_clk_get(dev, "refclk");
 		if (IS_ERR(clk) && PTR_ERR(clk) != -ENOENT) {
