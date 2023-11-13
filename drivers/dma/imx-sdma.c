@@ -1817,17 +1817,13 @@ static enum dma_status sdma_tx_status(struct dma_chan *chan,
 		spin_unlock_irqrestore(&sdmac->vc.lock, flags);
 		return ret;
 	}
-
 	spin_lock_irqsave(&sdmac->vc.lock, flags);
 	vd = vchan_find_desc(&sdmac->vc, cookie);
 	desc = to_sdma_desc(&vd->tx);
 	if (vd) {
 		if ((sdmac->flags & IMX_DMA_SG_LOOP)) {
-			if (sdmac->peripheral_type != IMX_DMATYPE_UART)
-				residue = (desc->num_bd - desc->buf_ptail) *
-					   sdmac->period_len - sdmac->chn_real_count;
-			else
-				residue = sdmac->chn_count - sdmac->chn_real_count;
+			residue = (desc->num_bd - desc->buf_ptail) *
+				sdmac->period_len - sdmac->chn_real_count;
 		} else
 			residue = sdmac->chn_count;
 	} else if (sdmac->desc && sdmac->desc->vd.tx.cookie == cookie)
