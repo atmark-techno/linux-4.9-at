@@ -474,8 +474,9 @@ static void imx_uart_stop_tx(struct uart_port *port)
 	struct imx_port *sport = (struct imx_port *)port;
 	u32 ucr1, ucr4, usr2;
 
-	if (sport->tx_state == OFF)
-		return;
+	if (!(port->rs485.flags & SER_RS485_ENABLED))
+		if (sport->tx_state == OFF)
+			return;
 
 	/*
 	 * We are maybe in the SMP context, so if the DMA TX thread is running
@@ -500,19 +501,26 @@ static void imx_uart_stop_tx(struct uart_port *port)
 	/* in rs485 mode disable transmitter */
 	if (port->rs485.flags & SER_RS485_ENABLED) {
 		if (sport->tx_state == SEND) {
-			sport->tx_state = WAIT_AFTER_SEND;
-
 			if (port->rs485.delay_rts_after_send > 0) {
+				sport->tx_state = WAIT_AFTER_SEND;
 				start_hrtimer_ms(&sport->trigger_stop_tx,
 					 port->rs485.delay_rts_after_send);
 				return;
 			}
 
+			sport->tx_state = OFF;
+
 			/* continue without any delay */
 		}
 
-		if (sport->tx_state == WAIT_AFTER_RTS ||
-		    sport->tx_state == WAIT_AFTER_SEND) {
+		/* Do not stop during rts delay after send */
+		if (sport->tx_state == WAIT_AFTER_SEND)
+			return;
+
+		if (sport->tx_state == WAIT_AFTER_RTS)
+			sport->tx_state = OFF;
+
+		if (sport->tx_state == OFF) {
 			u32 ucr2;
 
 			hrtimer_try_to_cancel(&sport->trigger_start_tx);
@@ -525,8 +533,6 @@ static void imx_uart_stop_tx(struct uart_port *port)
 			imx_uart_writel(sport, ucr2, UCR2);
 
 			imx_uart_start_rx(port);
-
-			sport->tx_state = OFF;
 		}
 	} else {
 		sport->tx_state = OFF;
@@ -755,20 +761,27 @@ static void imx_uart_start_tx(struct uart_port *port)
 			if (!(port->rs485.flags & SER_RS485_RX_DURING_TX))
 				imx_uart_stop_rx(port);
 
-			sport->tx_state = WAIT_AFTER_RTS;
-
 			if (port->rs485.delay_rts_before_send > 0) {
+				sport->tx_state = WAIT_AFTER_RTS;
 				start_hrtimer_ms(&sport->trigger_start_tx,
 					 port->rs485.delay_rts_before_send);
 				return;
 			}
 
+			sport->tx_state = SEND;
+
 			/* continue without any delay */
 		}
 
-		if (sport->tx_state == WAIT_AFTER_SEND
-		    || sport->tx_state == WAIT_AFTER_RTS) {
+		/* Do not send during rts delay before send */
+		if (sport->tx_state == WAIT_AFTER_RTS)
+			return;
 
+		/* Merge with previous send data */
+		if (sport->tx_state == WAIT_AFTER_SEND)
+			sport->tx_state = SEND;
+
+		if (sport->tx_state == SEND) {
 			hrtimer_try_to_cancel(&sport->trigger_stop_tx);
 
 			/*
@@ -781,8 +794,6 @@ static void imx_uart_start_tx(struct uart_port *port)
 				ucr4 |= UCR4_TCEN;
 				imx_uart_writel(sport, ucr4, UCR4);
 			}
-
-			sport->tx_state = SEND;
 		}
 	} else {
 		sport->tx_state = SEND;
@@ -2349,8 +2360,10 @@ static enum hrtimer_restart imx_trigger_start_tx(struct hrtimer *t)
 	unsigned long flags;
 
 	spin_lock_irqsave(&sport->port.lock, flags);
-	if (sport->tx_state == WAIT_AFTER_RTS)
+	if (sport->tx_state == WAIT_AFTER_RTS) {
+		sport->tx_state = SEND;
 		imx_uart_start_tx(&sport->port);
+	}
 	spin_unlock_irqrestore(&sport->port.lock, flags);
 
 	return HRTIMER_NORESTART;
@@ -2362,8 +2375,10 @@ static enum hrtimer_restart imx_trigger_stop_tx(struct hrtimer *t)
 	unsigned long flags;
 
 	spin_lock_irqsave(&sport->port.lock, flags);
-	if (sport->tx_state == WAIT_AFTER_SEND)
+	if (sport->tx_state == WAIT_AFTER_SEND) {
+		sport->tx_state = OFF;
 		imx_uart_stop_tx(&sport->port);
+	}
 	spin_unlock_irqrestore(&sport->port.lock, flags);
 
 	return HRTIMER_NORESTART;
