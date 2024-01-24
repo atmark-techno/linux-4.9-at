@@ -407,12 +407,11 @@ ifeq ($(CONFIG_BCMDHD_REQUEST_FW),y)
 	DHDCFLAGS += -DDHD_NVRAM_NAME="\"nvram.txt\""
 	DHDCFLAGS += -DDHD_CLM_NAME="\"clm_bcmdhd.blob\""
 else
-	DHDCFLAGS += -DDHD_SUPPORT_VFS_CALL
-ifeq ($(CONFIG_BCMDHD_FW_PATH),)
-	DHDCFLAGS += -DCONFIG_BCMDHD_FW_PATH="\"/lib/firmware/bcmdhd/fw_bcmdhd.bin\""
-	DHDCFLAGS += -DCONFIG_BCMDHD_NVRAM_PATH="\"/lib/firmware/bcmdhd/nvram.txt\""
-	DHDCFLAGS += -DCONFIG_BCMDHD_CLM_PATH="\"/lib/firmware/bcmdhd/clm_bcmdhd.blob\""
-endif
+	# Use firmwares embedded in CONFIG_EXTRA_FIRMWARE
+	DHDCFLAGS += -DDHD_LINUX_STD_FW_API
+	DHDCFLAGS += -DDHD_FW_NAME=\"bcmdhd/fw_bcm43752a2_pcie_ag_apsta.bin\"
+	DHDCFLAGS += -DDHD_NVRAM_NAME=\"bcmdhd/nvram_ap6275p_mp.txt\"
+	DHDCFLAGS += -DDHD_CLM_NAME=\"bcmdhd/clm_bcm43752a2_pcie_ag.blob\"
 endif
 
 ifeq ($(CONFIG_BCMDHD_AG),y)
