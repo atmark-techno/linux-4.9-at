@@ -37,10 +37,12 @@ static int gpio_bmic_gpio_direction_output(struct gpio_chip *gc,
 	struct gpio_bmic *gpio;
 	u8 output;
 	int ret = 0;
+	bool atomic_context = in_atomic() || irqs_disabled();
 
 	gpio = gpiochip_get_data(gc);
 
-	mutex_lock(&gpio->lock);
+	if (!atomic_context)
+		mutex_lock(&gpio->lock);
 
 	output = gpio->reg_output;
 	if (val)
@@ -58,7 +60,8 @@ static int gpio_bmic_gpio_direction_output(struct gpio_chip *gc,
 	gpio->reg_output = output;
 
 exit:
-	mutex_unlock(&gpio->lock);
+	if (!atomic_context)
+		mutex_unlock(&gpio->lock);
 	return ret;
 }
 
@@ -66,12 +69,15 @@ static int gpio_bmic_gpio_get_value(struct gpio_chip *gc, unsigned off)
 {
 	struct gpio_bmic *gpio;
 	u8 output;
+	bool atomic_context = in_atomic() || irqs_disabled();
 
 	gpio = gpiochip_get_data(gc);
 
-	mutex_lock(&gpio->lock);
+	if (!atomic_context)
+		mutex_lock(&gpio->lock);
 	output = gpio->reg_output;
-	mutex_unlock(&gpio->lock);
+	if (!atomic_context)
+		mutex_unlock(&gpio->lock);
 
 	return !!(output & (1 << (off + GPIO_BMIC_REG_OFFSET)));
 }
