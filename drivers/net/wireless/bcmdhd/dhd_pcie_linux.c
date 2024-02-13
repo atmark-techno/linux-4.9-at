@@ -313,7 +313,7 @@ static int dhdpcie_smmu_init(struct pci_dev *pdev, void *smmu_cxt)
 		smmu_info->smmu_iova_start = smmu_iova_address[0];
 		smmu_info->smmu_iova_len = smmu_iova_address[1];
 	} else {
-		printf("%s : can't get smmu iova address property\n",
+		pr_err("%s : can't get smmu iova address property\n",
 			__FUNCTION__);
 		return -ENODEV;
 	}
@@ -706,7 +706,7 @@ static int dhdpcie_pm_suspend(struct device *dev)
 	unsigned long flags;
 	int msglevel = dhd_msg_level;
 
-	printf("%s: Enter\n", __FUNCTION__);
+	pr_err("%s: Enter\n", __FUNCTION__);
 	if (pch) {
 		bus = pch->bus;
 	}
@@ -732,7 +732,7 @@ static int dhdpcie_pm_suspend(struct device *dev)
 	DHD_BUS_BUSY_CLEAR_SUSPEND_IN_PROGRESS(bus->dhd);
 	dhd_os_busbusy_wake(bus->dhd);
 	dhd_msg_level = msglevel;
-	printf("%s: Exit ret=%d\n", __FUNCTION__, ret);
+	pr_err("%s: Exit ret=%d\n", __FUNCTION__, ret);
 	DHD_GENERAL_UNLOCK(bus->dhd, flags);
 
 	return ret;
@@ -765,7 +765,7 @@ static int dhdpcie_pm_resume(struct device *dev)
 	unsigned long flags;
 	int msglevel = dhd_msg_level;
 
-	printf("%s: Enter\n", __FUNCTION__);
+	pr_err("%s: Enter\n", __FUNCTION__);
 	if (pch) {
 		bus = pch->bus;
 	}
@@ -785,7 +785,7 @@ static int dhdpcie_pm_resume(struct device *dev)
 	DHD_BUS_BUSY_CLEAR_RESUME_IN_PROGRESS(bus->dhd);
 	dhd_os_busbusy_wake(bus->dhd);
 	dhd_msg_level = msglevel;
-	printf("%s: Exit ret=%d\n", __FUNCTION__, ret);
+	pr_err("%s: Exit ret=%d\n", __FUNCTION__, ret);
 	DHD_GENERAL_UNLOCK(bus->dhd, flags);
 
 	return ret;
@@ -816,7 +816,7 @@ static int dhdpcie_pci_suspend(struct pci_dev * pdev, pm_message_t state)
 	unsigned long flags;
 	uint32 i = 0;
 
-	printf("%s: Enter\n", __FUNCTION__);
+	pr_err("%s: Enter\n", __FUNCTION__);
 	if (pch) {
 		bus = pch->bus;
 	}
@@ -869,7 +869,7 @@ static int dhdpcie_pci_suspend(struct pci_dev * pdev, pm_message_t state)
 	DHD_GENERAL_LOCK(bus->dhd, flags);
 	DHD_BUS_BUSY_CLEAR_SUSPEND_IN_PROGRESS(bus->dhd);
 	dhd_os_busbusy_wake(bus->dhd);
-	printf("%s: Exit ret=%d\n", __FUNCTION__, ret);
+	pr_err("%s: Exit ret=%d\n", __FUNCTION__, ret);
 	DHD_GENERAL_UNLOCK(bus->dhd, flags);
 
 	return ret;
@@ -937,7 +937,7 @@ static int dhdpcie_pci_resume(struct pci_dev *pdev)
 	dhd_bus_t *bus = NULL;
 	unsigned long flags;
 
-	printf("%s: Enter\n", __FUNCTION__);
+	pr_err("%s: Enter\n", __FUNCTION__);
 	if (pch) {
 		bus = pch->bus;
 	}
@@ -955,7 +955,7 @@ static int dhdpcie_pci_resume(struct pci_dev *pdev)
 	DHD_GENERAL_LOCK(bus->dhd, flags);
 	DHD_BUS_BUSY_CLEAR_RESUME_IN_PROGRESS(bus->dhd);
 	dhd_os_busbusy_wake(bus->dhd);
-	printf("%s: Exit ret=%d\n", __FUNCTION__, ret);
+	pr_err("%s: Exit ret=%d\n", __FUNCTION__, ret);
 	DHD_GENERAL_UNLOCK(bus->dhd, flags);
 
 #ifdef DHD_CFG80211_SUSPEND_RESUME
@@ -1250,13 +1250,13 @@ static int dhdpcie_resume_dev(struct pci_dev *dev)
 #endif /* FORCE_TPOWERON */
 	err = pci_enable_device(dev);
 	if (err) {
-		printf("%s:pci_enable_device error %d \n", __FUNCTION__, err);
+		pr_err("%s:pci_enable_device error %d \n", __FUNCTION__, err);
 		goto out;
 	}
 	pci_set_master(dev);
 	err = pci_set_power_state(dev, PCI_D0);
 	if (err) {
-		printf("%s:pci_set_power_state error %d \n", __FUNCTION__, err);
+		pr_err("%s:pci_set_power_state error %d \n", __FUNCTION__, err);
 		goto out;
 	}
 	BCM_REFERENCE(pch);
@@ -1579,7 +1579,7 @@ dhdpcie_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		goto exit;
 	}
 
-	printf("PCI_PROBE:  bus 0x%X, slot 0x%X,vendor 0x%X, device 0x%X"
+	pr_err("PCI_PROBE:  bus 0x%X, slot 0x%X,vendor 0x%X, device 0x%X"
 		"(good PCI location)\n", pdev->bus->number,
 		PCI_SLOT(pdev->devfn), pdev->vendor, pdev->device);
 
@@ -1755,9 +1755,9 @@ dhdpcie_request_irq(dhdpcie_info_t *dhdpcie_info)
 		}
 
 		if (bus->d2h_intr_method == PCIE_MSI)
-			printf("%s: MSI enabled, irq=%d\n", __FUNCTION__, pdev->irq);
+			pr_err("%s: MSI enabled, irq=%d\n", __FUNCTION__, pdev->irq);
 		else
-			printf("%s: INTx enabled, irq=%d\n", __FUNCTION__, pdev->irq);
+			pr_err("%s: INTx enabled, irq=%d\n", __FUNCTION__, pdev->irq);
 
 		err = request_irq(pdev->irq, dhdpcie_isr, IRQF_SHARED,
 			dhdpcie_info->pciname, bus);
@@ -1862,7 +1862,7 @@ int dhdpcie_get_resource(dhdpcie_info_t *dhdpcie_info)
 
 	do {
 		if (pci_enable_device(pdev)) {
-			printf("%s: Cannot enable PCI device\n", __FUNCTION__);
+			pr_err("%s: Cannot enable PCI device\n", __FUNCTION__);
 			break;
 		}
 		pci_set_master(pdev);
@@ -1873,7 +1873,7 @@ int dhdpcie_get_resource(dhdpcie_info_t *dhdpcie_info)
 		bar1_size = pci_resource_len(pdev, 2);
 
 		if ((bar1_size == 0) || (bar1_addr == 0)) {
-			printf("%s: BAR1 Not enabled for this device  size(%ld),"
+			pr_err("%s: BAR1 Not enabled for this device  size(%ld),"
 				" addr(0x"PRINTF_RESOURCE")\n",
 				__FUNCTION__, bar1_size, bar1_addr);
 			goto err;
@@ -2650,7 +2650,7 @@ dhdpcie_alloc_resource(dhd_bus_t *bus)
 		bar1_size = pci_resource_len(bus->dev, 2);
 
 		if ((bar1_size == 0) || (bar1_addr == 0)) {
-			printf("%s: BAR1 Not enabled for this device size(%ld),"
+			pr_err("%s: BAR1 Not enabled for this device size(%ld),"
 				" addr(0x"PRINTF_RESOURCE")\n",
 				__FUNCTION__, bar1_size, bar1_addr);
 			break;
@@ -2953,7 +2953,7 @@ int dhdpcie_oob_intr_register(dhd_bus_t *bus)
 	}
 
 	if (dhdpcie_osinfo->oob_irq_num > 0) {
-		printf("%s OOB irq=%d flags=0x%X\n", __FUNCTION__,
+		pr_err("%s OOB irq=%d flags=0x%X\n", __FUNCTION__,
 			(int)dhdpcie_osinfo->oob_irq_num,
 			(int)dhdpcie_osinfo->oob_irq_flags);
 #ifdef DHD_USE_PCIE_OOB_THREADED_IRQ
@@ -2972,15 +2972,15 @@ int dhdpcie_oob_intr_register(dhd_bus_t *bus)
 			return err;
 		}
 #if defined(DISABLE_WOWLAN)
-		printf("%s: disable_irq_wake\n", __FUNCTION__);
+		pr_err("%s: disable_irq_wake\n", __FUNCTION__);
 		dhdpcie_osinfo->oob_irq_wake_enabled = FALSE;
 #else
-		printf("%s: enable_irq_wake\n", __FUNCTION__);
+		pr_err("%s: enable_irq_wake\n", __FUNCTION__);
 		err = enable_irq_wake(dhdpcie_osinfo->oob_irq_num);
 		if (!err) {
 			dhdpcie_osinfo->oob_irq_wake_enabled = TRUE;
 		} else
-			printf("%s: enable_irq_wake failed with %d\n", __FUNCTION__, err);
+			pr_err("%s: enable_irq_wake failed with %d\n", __FUNCTION__, err);
 #endif
 		dhdpcie_osinfo->oob_irq_enabled = TRUE;
 	}

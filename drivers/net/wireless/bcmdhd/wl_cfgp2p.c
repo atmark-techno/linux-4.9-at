@@ -2666,7 +2666,7 @@ wl_cfgp2p_start_p2p_device(struct wiphy *wiphy, struct wireless_dev *wdev)
 #ifdef WL_IFACE_MGMT
 	if (wl_cfg80211_get_sec_iface(cfg) != WL_IFACE_NOT_PRESENT) {
 		/* Delay fw initialization till actual discovery. */
-		CFGP2P_ERR(("SEC IFACE present. Initialize p2p from discovery context\n"));
+		CFGP2P_INFO(("SEC IFACE present. Initialize p2p from discovery context\n"));
 		return BCME_OK;
 	}
 #endif /* WL_IFACE_MGMT */

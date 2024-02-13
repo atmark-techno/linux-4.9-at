@@ -32,7 +32,7 @@
 #include <wl_escan.h>
 #endif /* WL_ESCAN */
 
-uint android_msg_level = ANDROID_ERROR_LEVEL | ANDROID_MSG_LEVEL;
+uint android_msg_level = ANDROID_ERROR_LEVEL;
 
 #define AEXT_ERROR(name, arg1, args...) \
 	do { \
