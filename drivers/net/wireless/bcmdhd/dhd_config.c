@@ -42,28 +42,28 @@
 
 /* message levels */
 #define CONFIG_ERROR_LEVEL	(1 << 0)
-#define CONFIG_TRACE_LEVEL	(1 << 1)
-#define CONFIG_MSG_LEVEL	(1 << 0)
+#define CONFIG_TRACE_LEVEL	(1 << 2)
+#define CONFIG_MSG_LEVEL	(1 << 1)
 
-uint config_msg_level = CONFIG_ERROR_LEVEL | CONFIG_MSG_LEVEL;
+uint config_msg_level = CONFIG_ERROR_LEVEL;
 uint dump_msg_level = 0;
 
 #define CONFIG_MSG(x, args...) \
 	do { \
 		if (config_msg_level & CONFIG_MSG_LEVEL) { \
-			printf("%s : " x, __func__, ## args); \
+			pr_info("%s : " x, __func__, ## args); \
 		} \
 	} while (0)
 #define CONFIG_ERROR(x, args...) \
 	do { \
 		if (config_msg_level & CONFIG_ERROR_LEVEL) { \
-			printf("CONFIG-ERROR) %s : " x, __func__, ## args); \
+			pr_err("CONFIG-ERROR) %s : " x, __func__, ## args); \
 		} \
 	} while (0)
 #define CONFIG_TRACE(x, args...) \
 	do { \
 		if (config_msg_level & CONFIG_TRACE_LEVEL) { \
-			printf("CONFIG-TRACE) %s : " x, __func__, ## args); \
+			pr_debug("CONFIG-TRACE) %s : " x, __func__, ## args); \
 		} \
 	} while (0)
 
