@@ -1251,7 +1251,7 @@ static int imx6_pcie_probe(struct platform_device *pdev)
 		}
 	}
 
-	imx6_pcie->clkreq_gpio = of_get_named_gpio(np, "clkreq-gpio", 0);
+	imx6_pcie->clkreq_gpio = of_get_named_gpio(node, "clkreq-gpio", 0);
 	if (gpio_is_valid(imx6_pcie->clkreq_gpio)) {
 		ret = devm_gpio_request_one(&pdev->dev,
 					    imx6_pcie->clkreq_gpio,
@@ -1263,7 +1263,7 @@ static int imx6_pcie_probe(struct platform_device *pdev)
 		}
 	}
 
-	imx6_pcie->wake_gpio = of_get_named_gpio(np, "wake-gpio", 0);
+	imx6_pcie->wake_gpio = of_get_named_gpio(node, "wake-gpio", 0);
 	if (gpio_is_valid(imx6_pcie->wake_gpio)) {
 		ret = devm_gpio_request_one(&pdev->dev,
 					    imx6_pcie->wake_gpio,
