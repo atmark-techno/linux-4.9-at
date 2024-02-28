@@ -87,6 +87,9 @@
 #include <linux/interrupt.h>
 #include <linux/kthread.h>
 #include <linux/netdevice.h>
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0))
+#include <net/netdev_rx_queue.h>
+#endif
 #include <linux/time.h>
 #include <linux/rtc.h>
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27))
@@ -392,7 +395,9 @@ extern void timer_cb_compat(struct timer_list *tl);
 #define timer_expires(timer_compat) (timer_compat)->timer.expires
 
 #define del_timer(t) del_timer(&((t)->timer))
+#ifndef del_timer_sync
 #define del_timer_sync(t) del_timer_sync(&((t)->timer))
+#endif
 #define timer_pending(t) timer_pending(&((t)->timer))
 #define add_timer(t) add_timer(&((t)->timer))
 #define mod_timer(t, j) mod_timer(&((t)->timer), j)
@@ -621,12 +626,26 @@ typedef struct {
 /* ANDREY: new MACROs to start stop threads(OLD kthread API STYLE) */
 /* requires  tsk_ctl_t tsk  argument, the caller's priv data is passed in owner ptr */
 /* note this macro assumes there may be only one context waiting on thread's completion */
+#ifdef KERNEL_TIMESTAMP
+extern char *dhd_log_dump_get_timestamp(void);
+#ifdef SYSTEM_TIMESTAMP
+extern char* dhd_dbg_get_system_timestamp(void);
+#define PRINTF_SYSTEM_TIME dhd_log_dump_get_timestamp(), dhd_dbg_get_system_timestamp()
+#define PERCENT_S "[%s][%s]"
+#else
+#define PRINTF_SYSTEM_TIME dhd_log_dump_get_timestamp()
+#define PERCENT_S "[%s]"
+#endif
+#else
+#define PRINTF_SYSTEM_TIME ""
+#define PERCENT_S "%s"
+#endif
 #ifndef DHD_LOG_PREFIX
 #define DHD_LOG_PREFIX "[dhd]"
 #endif
 #define DHD_LOG_PREFIXS DHD_LOG_PREFIX" "
 #ifdef DHD_DEBUG
-#define	printf_thr(fmt, args...)	printk(DHD_LOG_PREFIXS fmt , ## args)
+#define	printf_thr(fmt, args...)	printk(PERCENT_S DHD_LOG_PREFIXS fmt, PRINTF_SYSTEM_TIME, ## args)
 #define DBG_THR(args)		do {printf_thr args;} while (0)
 #else
 #define DBG_THR(x)
@@ -870,7 +889,10 @@ not match our unaligned address for < 2.6.24
 
 #define KMALLOC_FLAG (CAN_SLEEP() ? GFP_KERNEL: GFP_ATOMIC)
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 170))
+#define RANDOM32	get_random_u32
+#define RANDOM_BYTES    get_random_bytes
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0))
 #define RANDOM32	prandom_u32
 #define RANDOM_BYTES    prandom_bytes
 #else
@@ -921,5 +943,36 @@ int kernel_read_compat(struct file *file, loff_t offset, char *addr, unsigned lo
 #else /* LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0) */
 #define kernel_read_compat(file, offset, addr, count) kernel_read(file, offset, addr, count)
 #endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0) */
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0))
+#include <linux/sched/clock.h>
+#endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(6, 3, 0)) */
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 32)
+#define netdev_tx_t int
+#endif
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0))
+#define complete_and_exit(a, b) kthread_complete_and_exit(a, b)
+#else
+#define	dev_addr_set(net, addr) memcpy(net->dev_addr, addr, ETHER_ADDR_LEN)
+#endif /* LINUX_VERSION_CODE > KERNEL_VERSION(5, 17, 0) */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0))
+#define netif_rx_ni(skb) netif_rx(skb)
+#define pci_free_consistent(a, b, c, d) dma_free_coherent(&((struct pci_dev *)a)->dev, b, c, d)
+#define pci_map_single(a, b, c, d) dma_map_single(&((struct pci_dev *)a)->dev, b, c, d)
+#define pci_unmap_single(a, b, c, d) dma_unmap_single(&((struct pci_dev *)a)->dev, b, c, d)
+#define pci_dma_mapping_error(a, b) dma_mapping_error(&((struct pci_dev *)a)->dev, b)
+#ifndef PCI_DMA_TODEVICE
+#define	PCI_DMA_TODEVICE	1
+#define	PCI_DMA_FROMDEVICE	2
+#endif
+#endif
+
+#ifdef ANDROID_BKPORT
+#if (ANDROID_VERSION >= 13) && (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 41))
+#define ANDROID13_KERNEL515_BKPORT
+#define CFG80211_BKPORT_MLO
+#endif /* ANDROID_VERSION >= 13 && KERNEL >= 5.15.41 */
+#endif /* ANDROID_BKPORT */
 
 #endif /* _linuxver_h_ */

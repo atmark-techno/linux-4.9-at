@@ -44,6 +44,8 @@ typedef uint16 chanspec_subband_t;
 #define CH_MAX_2G_CHANNEL                14u    /* Max channel in 2G band */
 #define CH_MIN_2G_40M_CHANNEL             3u    /* Min 40MHz center channel in 2G band */
 #define CH_MAX_2G_40M_CHANNEL            11u    /* Max 40MHz center channel in 2G band */
+#define CH_MIN_5G_CHANNEL                34u    /* Min channel in 5G band */
+#define CH_MAX_5G_CHANNEL               177u    /* Max channel in 5G band */
 
 #define CH_MIN_6G_CHANNEL                 1u    /* Min 20MHz channel in 6G band */
 #define CH_MAX_6G_CHANNEL               253u    /* Max 20MHz channel in 6G band */
@@ -356,7 +358,7 @@ uint wf_chspec_first_20_sb(chanspec_t chspec);
 	((((chspec) & WL_CHANSPEC_CTL_SB_MASK) == WL_CHANSPEC_CTL_SB_LOWER) && \
 	(((chspec) & WL_CHANSPEC_BW_MASK) == WL_CHANSPEC_BW_40))
 
-#ifdef WL_BAND6G
+#ifdef WL_6G_BAND
 #define CHSPEC2WLC_BAND(chspec) (CHSPEC_IS2G(chspec) ? WLC_BAND_2G : CHSPEC_IS5G(chspec) ? \
 	WLC_BAND_5G : WLC_BAND_6G)
 #else

@@ -29,11 +29,6 @@
 
 #include <typedefs.h>
 
-//SparkLAN SPKL - no big endian support
-#if defined(CONFIG_CPU_BIG_ENDIAN)
-#error "Not supported platform - BIG-Endian"
-#endif
-
 /* Reverse the bytes in a 16-bit value */
 #define BCMSWAP16(val) \
 	((uint16)((((uint16)(val) & (uint16)0x00ffU) << 8) | \

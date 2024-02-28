@@ -29,9 +29,13 @@
 #include <wldev_common.h>
 #include <dngl_stats.h>
 #include <dhd.h>
+#include <wl_android_ext.h>
 #ifdef WL_EXT_IAPSTA
 #include <wl_iapsta.h>
 #endif /* WL_IAPSTA */
+#ifdef WL_ESCAN
+#include <wl_escan.h>
+#endif /* WL_ESCAN */
 #if defined(WL_EXT_IAPSTA) || defined(USE_IW) || defined(WL_ESCAN) || \
 	(defined(WL_EXT_GENL) && defined(SENDPROB))
 #ifndef WL_EVENT
@@ -39,7 +43,7 @@
 #endif
 #include <wl_event.h>
 #endif
-#include <wl_android_ext.h>
+#include <wl_timer.h>
 
 /* If any feature uses the Generic Netlink Interface, put it here to enable WL_GENL
  * automatically
@@ -78,12 +82,16 @@ typedef struct _compat_android_wifi_priv_cmd {
 #define ANDROID_INFO_LEVEL	(1 << 2)
 #define ANDROID_SCAN_LEVEL	(1 << 3)
 #define ANDROID_DBG_LEVEL	(1 << 4)
-#define ANDROID_MSG_LEVEL	(1 << 5)
+#define ANDROID_TPUT_LEVEL	(1 << 8)
+#define ANDROID_AMPDU_LEVEL	(1 << 9)
+#define ANDROID_TVPM_LEVEL	(1 << 10)
+#define ANDROID_BTC_LEVEL	(1 << 11)
+#define ANDROID_MSG_LEVEL	(1 << 0)
 
 #define WL_MSG(name, arg1, args...) \
 	do { \
 		if (android_msg_level & ANDROID_MSG_LEVEL) { \
-			printk(KERN_ERR DHD_LOG_PREFIX "[%s] %s : " arg1, name, __func__, ## args); \
+			printf("[%s] %s : " arg1, name, __func__, ## args); \
 		} \
 	} while (0)
 
@@ -95,13 +103,13 @@ do {	\
 		static uint32 __err_cnt = 0; \
 		uint64 __cur_ts = 0; \
 		static uint8 static_tmp[size]; \
-		__cur_ts = local_clock(); \
+		__cur_ts = osl_localtime_ns(); \
 		if (__err_ts == 0 || (__cur_ts > __err_ts && \
 		(__cur_ts - __err_ts > WL_MSG_PRINT_RATE_LIMIT_PERIOD)) || \
 		memcmp(&static_tmp, cmp, size)) { \
 			__err_ts = __cur_ts; \
 			memcpy(static_tmp, cmp, size); \
-			printk(KERN_ERR DHD_LOG_PREFIX "[%s] %s : [%u times] " arg1, \
+			printf("[%s] %s : [%u times] " arg1, \
 				name, __func__, __err_cnt, ## args); \
 			__err_cnt = 0; \
 		} else { \
@@ -245,4 +253,11 @@ extern int wl_android_bcnrecv_event(struct net_device *ndev,
 #define WLC_ACS_BAND_INVALID	0xffffu
 #endif /* WL_SUPPORT_AUTO_CHANNEL */
 #define WL_PRIV_CMD_LEN 64
+#define CHECK_SCNPRINTF_RET_VAL(ret) \
+	{ \
+		if (ret < 0) { \
+				WL_ERR(("scnprintf failed %d\n", ret)); \
+				return BCME_ERROR; \
+		} \
+	}
 #endif /* _wl_android_ */

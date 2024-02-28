@@ -28,10 +28,14 @@
 #define DECLSPEC_ALIGN(x)	__attribute__ ((aligned(x)))
 
 /* Linux Kernel: File Operations: start */
-extern void * osl_os_open_image(char * filename);
-extern int osl_os_get_image_block(char * buf, int len, void * image);
-extern void osl_os_close_image(void * image);
-extern int osl_os_image_size(void *image);
+static INLINE void * osl_os_open_image(char * filename)
+	{ return NULL; }
+static INLINE void osl_os_close_image(void * image)
+	{ return; }
+static INLINE int osl_os_get_image_block(char * buf, int len, void * image)
+	{ return 0; }
+static INLINE int osl_os_image_size(void *image)
+	{ return 0; }
 /* Linux Kernel: File Operations: end */
 
 #ifdef BCMDRIVER
@@ -106,6 +110,7 @@ extern void osl_sleep(uint ms);
 extern uint32 osl_pci_read_config(osl_t *osh, uint offset, uint size);
 extern void osl_pci_write_config(osl_t *osh, uint offset, uint size, uint val);
 
+#ifdef BCMPCIE
 /* PCI device bus # and slot # */
 #define OSL_PCI_BUS(osh)	osl_pci_bus(osh)
 #define OSL_PCI_SLOT(osh)	osl_pci_slot(osh)
@@ -116,6 +121,7 @@ extern uint osl_pci_slot(osl_t *osh);
 extern uint osl_pcie_domain(osl_t *osh);
 extern uint osl_pcie_bus(osl_t *osh);
 extern struct pci_dev *osl_pci_device(osl_t *osh);
+#endif
 
 /* precommit failed when this is removed */
 /* BLAZAR_BRANCH_101_10_DHD_003/build/dhd/linux-fc30/brix-brcm */
@@ -273,8 +279,7 @@ extern void osl_preempt_enable(osl_t *osh);
 #define OSL_DISABLE_PREEMPTION(osh)	osl_preempt_disable(osh)
 #define OSL_ENABLE_PREEMPTION(osh)	osl_preempt_enable(osh)
 
-#if (!defined(DHD_USE_COHERENT_MEM_FOR_RING) && defined(__ARM_ARCH_7A__))
-
+#if (defined(BCMPCIE) && !defined(DHD_USE_COHERENT_MEM_FOR_RING) && defined(__ARM_ARCH_7A__))
 	extern void osl_cache_flush(void *va, uint size);
 	extern void osl_cache_inv(void *va, uint size);
 	extern void osl_prefetch(const void *ptr);
@@ -348,7 +353,7 @@ extern uint64 osl_systztime_us(void);
 #define OSL_LOCALTIME_NS()	osl_localtime_ns()
 #define OSL_GET_LOCALTIME(sec, usec)	osl_get_localtime((sec), (usec))
 #define OSL_SYSTZTIME_US()	osl_systztime_us()
-#define	printf(fmt, args...)	pr_debug(DHD_LOG_PREFIXS fmt , ## args)
+#define	printf(fmt, args...)	printk(PERCENT_S DHD_LOG_PREFIXS fmt, PRINTF_SYSTEM_TIME, ## args)
 #include <linux/kernel.h>	/* for vsn/printf's */
 #include <linux/string.h>	/* for mem*, str* */
 /* bcopy's: Linux kernel doesn't provide these (anymore) */
@@ -654,7 +659,7 @@ extern void osl_writeq(osl_t *osh, volatile uint64 *r, uint64 v);
  * agree with me).  I may be able to even remove these references eventually with
  * a GNU binutil such as objcopy via a symbol rename (i.e. memcpy to osl_memcpy).
  */
-	#define	printf(fmt, args...)	pr_debug(fmt , ## args)
+	#define	printf(fmt, args...)	printk(fmt , ## args)
 	#include <linux/kernel.h>	/* for vsn/printf's */
 	#include <linux/string.h>	/* for mem*, str* */
 	/* bcopy's: Linux kernel doesn't provide these (anymore) */
@@ -812,7 +817,7 @@ typedef struct osl_timer {
 
 typedef void (*linux_timer_fn)(ulong arg);
 
-extern osl_timer_t * osl_timer_init(osl_t *osh, const char *name, void (*fn)(void *arg), void *arg);
+extern osl_timer_t * osl_timer_init(osl_t *osh, const char *name, void (*fn)(ulong arg), void *arg);
 extern void osl_timer_add(osl_t *osh, osl_timer_t *t, uint32 ms, bool periodic);
 extern void osl_timer_update(osl_t *osh, osl_timer_t *t, uint32 ms, bool periodic);
 extern bool osl_timer_del(osl_t *osh, osl_timer_t *t);

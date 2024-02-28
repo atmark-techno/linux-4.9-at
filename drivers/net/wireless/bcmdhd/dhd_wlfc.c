@@ -1059,6 +1059,9 @@ _dhd_wlfc_flow_control_check(athost_wl_status_info_t* ctx, struct pktq* pq, uint
 	dhdp = (dhd_pub_t *)ctx->dhdp;
 	ASSERT(dhdp);
 
+	if (if_id >= WLFC_MAX_IFNUM)
+		return;
+
 	if (dhdp->skip_fc && dhdp->skip_fc((void *)dhdp, if_id))
 		return;
 
@@ -1730,7 +1733,7 @@ _dhd_wlfc_pktq_flush(athost_wl_status_info_t* ctx, struct pktq *pq,
 				bool head = (p == q->head);
 				if (head)
 					q->head = PKTLINK(p);
-				else
+				else if (prev)
 					PKTSETLINK(prev, PKTLINK(p));
 				if (q_type == Q_TYPE_PSQ) {
 					if (!WLFC_GET_AFQ(dhdp->wlfc_mode) && (prec & 1)) {
@@ -4034,7 +4037,7 @@ dhd_wlfc_hostreorder_init(dhd_pub_t *dhd)
 	dhd->proptxstatus_mode = WLFC_ONLY_AMPDU_HOSTREORDER;
 	dhd_os_wlfc_unblock(dhd);
 	/* terence 20161229: enable ampdu_hostreorder if tlv enable hostreorder */
-	dhd_conf_set_intiovar(dhd, WLC_SET_VAR, "ampdu_hostreorder", 1, 0, TRUE);
+	dhd_conf_set_intiovar(dhd, 0, WLC_SET_VAR, "ampdu_hostreorder", 1, 0, TRUE);
 
 	return BCME_OK;
 }
@@ -4938,10 +4941,6 @@ int dhd_txpkt_log_and_dump(dhd_pub_t *dhdp, void* pkt, uint16 *pktfate_status)
 	uint8 hcnt = WL_TXSTATUS_GET_FREERUNCTR(DHD_PKTTAG_H2DTAG(PKTTAG(pkt)));
 	uint8 fifo_id = DHD_PKTTAG_FIFO(PKTTAG(pkt));
 
-	if (!pkt) {
-		DHD_ERROR(("Error: %s():%d\n", __FUNCTION__, __LINE__));
-		return BCME_BADARG;
-	}
 	pktid = (ifidx << DHD_PKTID_IF_SHIFT) | (fifo_id << DHD_PKTID_FIFO_SHIFT) | hcnt;
 #ifdef BDC
 	bdch = (struct bdc_header *)pktdata;

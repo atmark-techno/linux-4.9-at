@@ -48,18 +48,28 @@ extern dhd_pub_t* g_dhd_pub;
 static int dhd_ring_proc_open(struct inode *inode, struct file *file);
 ssize_t dhd_ring_proc_read(struct file *file, char *buffer, size_t tt, loff_t *loff);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 6, 0))
 static const struct file_operations dhd_ring_proc_fops = {
 	.open = dhd_ring_proc_open,
 	.read = dhd_ring_proc_read,
 	.release = single_release,
 };
+#else
+static const struct proc_ops dhd_ring_proc_fops = {
+	.proc_open = dhd_ring_proc_open,
+	.proc_read = dhd_ring_proc_read,
+	.proc_release = single_release,
+};
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(5, 6, 0) */
 
 static int
 dhd_ring_proc_open(struct inode *inode, struct file *file)
 {
 	int ret = BCME_ERROR;
 	if (inode) {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0))
+		ret = single_open(file, 0, pde_data(inode));
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0))
 		ret = single_open(file, 0, PDE_DATA(inode));
 #else
 		/* This feature is not supported for lower kernel versions */
@@ -177,6 +187,7 @@ dhd_dbg_ring_proc_destroy(dhd_pub_t *dhdp)
  * -----------------------------------------------------------------------------
  */
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0))
 #if defined(DHD_TRACE_WAKE_LOCK)
 extern atomic_t trace_wklock_onoff;
 
@@ -1030,6 +1041,7 @@ done:
 	return ret;
 }
 #endif /* PWRSTATS_SYSFS */
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0) */
 
 /*
  * Generic Attribute Structure for DHD.
@@ -1046,6 +1058,7 @@ struct dhd_attr {
 	ssize_t(*store)(struct dhd_info *, const char *, size_t count);
 };
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0))
 #if defined(DHD_TRACE_WAKE_LOCK)
 static struct dhd_attr dhd_attr_wklock =
 	__ATTR(wklock_trace, 0660, show_wklock_trace, wklock_trace_onoff);
@@ -1119,10 +1132,12 @@ static struct dhd_attr dhd_attr_nvram_path =
 static struct dhd_attr dhd_attr_pwrstats_path =
 	__ATTR(power_stats, 0660, show_pwrstats_path, NULL);
 #endif /* PWRSTATS_SYSFS */
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0) */
 
 #define to_dhd(k) container_of(k, struct dhd_info, dhd_kobj)
 #define to_attr(a) container_of(a, struct dhd_attr, attr)
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0))
 #ifdef DHD_MAC_ADDR_EXPORT
 struct ether_addr sysfs_mac_addr;
 static ssize_t
@@ -1154,6 +1169,7 @@ set_mac_addr(struct dhd_info *dev, const char *buf, size_t count)
 static struct dhd_attr dhd_attr_macaddr =
 	__ATTR(mac_addr, 0660, show_mac_addr, set_mac_addr);
 #endif /* DHD_MAC_ADDR_EXPORT */
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0) */
 
 #ifdef DHD_FW_COREDUMP
 /*
@@ -1185,8 +1201,8 @@ get_mem_val_from_file(void)
 	int ret = 0;
 
 	/* Read memdump info from the file */
-	fp = filp_open(filepath, O_RDONLY, 0);
-	if (IS_ERR(fp)) {
+	fp = dhd_filp_open(filepath, O_RDONLY, 0);
+	if (IS_ERR(fp) || (fp == NULL)) {
 		DHD_ERROR(("%s: File [%s] doesn't exist\n", __FUNCTION__, filepath));
 #if defined(CONFIG_X86) && defined(OEM_ANDROID)
 		/* Check if it is Live Brix Image */
@@ -1196,8 +1212,8 @@ get_mem_val_from_file(void)
 		/* Try if it is Installed Brix Image */
 		filepath = MEMDUMPINFO_INST;
 		DHD_ERROR(("%s: Try File [%s]\n", __FUNCTION__, filepath));
-		fp = filp_open(filepath, O_RDONLY, 0);
-		if (IS_ERR(fp)) {
+		fp = dhd_filp_open(filepath, O_RDONLY, 0);
+		if (IS_ERR(fp) || (fp == NULL)) {
 			DHD_ERROR(("%s: File [%s] doesn't exist\n", __FUNCTION__, filepath));
 			goto done;
 		}
@@ -1207,10 +1223,10 @@ get_mem_val_from_file(void)
 	}
 
 	/* Handle success case */
-	ret = kernel_read_compat(fp, 0, (char *)&mem_val, sizeof(uint32));
+	ret = dhd_kernel_read_compat(fp, 0, (char *)&mem_val, sizeof(uint32));
 	if (ret < 0) {
 		DHD_ERROR(("%s: File read error, ret=%d\n", __FUNCTION__, ret));
-		filp_close(fp, NULL);
+		dhd_filp_close(fp, NULL);
 		goto done;
 	}
 
@@ -1218,7 +1234,7 @@ get_mem_val_from_file(void)
 	p_mem_val[sizeof(uint32) - 1] = '\0';
 	mem_val = bcm_atoi(p_mem_val);
 
-	filp_close(fp, NULL);
+	dhd_filp_close(fp, NULL);
 
 done:
 	return mem_val;
@@ -1262,6 +1278,7 @@ void dhd_get_memdump_info(dhd_pub_t *dhd)
 	DHD_ERROR(("%s: MEMDUMP ENABLED = %u\n", __FUNCTION__, dhd->memdump_enabled));
 }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0))
 #ifdef DHD_EXPORT_CNTL_FILE
 static ssize_t
 show_memdump_info(struct dhd_info *dev, char *buf)
@@ -1303,6 +1320,7 @@ set_memdump_info(struct dhd_info *dev, const char *buf, size_t count)
 static struct dhd_attr dhd_attr_memdump =
 	__ATTR(memdump, 0660, show_memdump_info, set_memdump_info);
 #endif /* DHD_EXPORT_CNTL_FILE */
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0) */
 #endif /* DHD_FW_COREDUMP */
 
 #ifdef BCMASSERT_LOG
@@ -1327,11 +1345,11 @@ get_assert_val_from_file(void)
 	 * 2: Trigger Kernel crash by BUG()
 	 * File doesn't exist: Keep default value (1).
 	 */
-	fp = filp_open(filepath, O_RDONLY, 0);
-	if (IS_ERR(fp)) {
+	fp = dhd_filp_open(filepath, O_RDONLY, 0);
+	if (IS_ERR(fp) || (fp == NULL)) {
 		DHD_ERROR(("%s: File [%s] doesn't exist\n", __FUNCTION__, filepath));
 	} else {
-		int ret = kernel_read_compat(fp, 0, (char *)&mem_val, sizeof(uint32));
+		int ret = dhd_kernel_read_compat(fp, 0, (char *)&mem_val, sizeof(uint32));
 		if (ret < 0) {
 			DHD_ERROR(("%s: File read error, ret=%d\n", __FUNCTION__, ret));
 		} else {
@@ -1340,7 +1358,7 @@ get_assert_val_from_file(void)
 			mem_val = bcm_atoi(p_mem_val);
 			DHD_ERROR(("%s: ASSERT ENABLED = %d\n", __FUNCTION__, mem_val));
 		}
-		filp_close(fp, NULL);
+		dhd_filp_close(fp, NULL);
 	}
 
 #ifdef CUSTOMER_HW4_DEBUG
@@ -1362,6 +1380,7 @@ void dhd_get_assert_info(dhd_pub_t *dhd)
 #endif /* !DHD_EXPORT_CNTL_FILE */
 }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0))
 #ifdef DHD_EXPORT_CNTL_FILE
 static ssize_t
 show_assert_info(struct dhd_info *dev, char *buf)
@@ -1396,8 +1415,10 @@ set_assert_info(struct dhd_info *dev, const char *buf, size_t count)
 static struct dhd_attr dhd_attr_assert =
 	__ATTR(assert, 0660, show_assert_info, set_assert_info);
 #endif /* DHD_EXPORT_CNTL_FILE */
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0) */
 #endif /* BCMASSERT_LOG */
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0))
 #ifdef DHD_EXPORT_CNTL_FILE
 #if defined(WRITE_WLANINFO)
 static ssize_t
@@ -1889,10 +1910,12 @@ store_adps_bam_list(struct dhd_info *dev, const char *buf, size_t count)
 static struct dhd_attr dhd_attr_adps_bam =
 	__ATTR(bad_ap_list, 0660, show_adps_bam_list, store_adps_bam_list);
 #endif	/* DHD_ADPS_BAM_EXPORT && WL_BAM */
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0) */
 
-#ifdef DHD_SEND_HANG_PRIVCMD_ERRORS
 uint32 report_hang_privcmd_err = 1;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0))
+#ifdef DHD_SEND_HANG_PRIVCMD_ERRORS
 static ssize_t
 show_hang_privcmd_err(struct dhd_info *dev, char *buf)
 {
@@ -2350,6 +2373,7 @@ static struct attribute *default_file_attrs[] = {
 #endif /* AGG_H2D_DB */
 	NULL
 };
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0) */
 
 /*
  * wifi kobject show function, the "attr" attribute specifices to which
@@ -2406,7 +2430,9 @@ static struct sysfs_ops dhd_sysfs_ops = {
 
 static struct kobj_type dhd_ktype = {
 	.sysfs_ops = &dhd_sysfs_ops,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0))
 	.default_attrs = default_file_attrs,
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0) */
 };
 
 #ifdef CSI_SUPPORT
@@ -2425,7 +2451,7 @@ static ssize_t read_csi_data(struct file *filp, struct kobject *kobj,
 }
 
 static struct bin_attribute dhd_attr_csi = {
-	.attr = { .name = "csi",
+	.attr = { .name = "csi" BUS_TYPE,
 		  .mode = 0660, },
 	.size = MAX_CSI_FILESZ,
 	.read = read_csi_data,
@@ -2436,6 +2462,7 @@ static struct bin_attribute dhd_attr_csi = {
  * sysfs for dhd_lb
  */
 #ifdef DHD_LB
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0))
 #if defined(DHD_LB_TXP)
 static ssize_t
 show_lbtxp(struct dhd_info *dev, char *buf)
@@ -2830,6 +2857,7 @@ static struct attribute *debug_lb_attrs[] = {
 	&dhd_tx_cpu.attr,
 	NULL
 };
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0) */
 
 #define to_dhd_lb(k) container_of(k, struct dhd_info, dhd_lb_kobj)
 
@@ -2888,7 +2916,9 @@ static struct sysfs_ops dhd_sysfs_lb_ops = {
 
 static struct kobj_type dhd_lb_ktype = {
 	.sysfs_ops = &dhd_sysfs_lb_ops,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0))
 	.default_attrs = debug_lb_attrs,
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0) */
 };
 #endif /* DHD_LB */
 
@@ -2903,7 +2933,7 @@ int dhd_sysfs_init(dhd_info_t *dhd)
 	}
 
 	/* Initialize the kobject */
-	ret = kobject_init_and_add(&dhd->dhd_kobj, &dhd_ktype, NULL, "wifi");
+	ret = kobject_init_and_add(&dhd->dhd_kobj, &dhd_ktype, NULL, "wifi" BUS_TYPE);
 	if (ret) {
 		kobject_put(&dhd->dhd_kobj);
 		DHD_ERROR(("%s(): Unable to allocate kobject \r\n", __FUNCTION__));

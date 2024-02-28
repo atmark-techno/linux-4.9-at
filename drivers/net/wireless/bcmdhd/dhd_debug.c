@@ -321,11 +321,11 @@ dhd_dbg_msgtrace_msg_parser(void *event_data)
 	 */
 	while (*data != '\0' && (s = strstr(data, "\n")) != NULL) {
 		*s = '\0';
-		DHD_FWLOG(("[FWLOG] %s\n", data));
+		printf("[FWLOG] %s\n", data);
 		data = s+1;
 	}
 	if (*data)
-		DHD_FWLOG(("[FWLOG] %s", data));
+		printf("[FWLOG] %s", data);
 }
 #ifdef SHOW_LOGTRACE
 #define DATA_UNIT_FOR_LOG_CNT 4
@@ -832,13 +832,18 @@ dhd_dbg_verboselog_printf(dhd_pub_t *dhdp, prcd_event_log_hdr_t *plog_hdr,
 	/* ensure preserve fw logs go to debug_dump only in case of customer4 */
 	if (logset < dhdp->event_log_max_sets &&
 			((0x01u << logset) & dhdp->logset_prsrv_mask)) {
-		DHD_PRSRV_MEM((fmtstr_loc_buf, arg[0], arg[1], arg[2], arg[3],
-			arg[4], arg[5], arg[6], arg[7], arg[8], arg[9], arg[10],
-			arg[11], arg[12], arg[13], arg[14], arg[15]));
+		if (dhd_msg_level & DHD_EVENT_VAL) {
+			if (dhd_msg_level & DHD_PRSRV_MEM_VAL)
+				printk(fmtstr_loc_buf, arg[0], arg[1], arg[2], arg[3],
+					arg[4], arg[5], arg[6], arg[7], arg[8], arg[9], arg[10],
+					arg[11], arg[12], arg[13], arg[14], arg[15]);
+		}
 	} else {
-		DHD_FWLOG((fmtstr_loc_buf, arg[0], arg[1], arg[2], arg[3],
-			arg[4], arg[5], arg[6], arg[7], arg[8], arg[9], arg[10],
-			arg[11], arg[12], arg[13], arg[14], arg[15]));
+		if (dhd_msg_level & DHD_FWLOG_VAL) {
+			printk(fmtstr_loc_buf, arg[0], arg[1], arg[2], arg[3],
+				arg[4], arg[5], arg[6], arg[7], arg[8], arg[9], arg[10],
+				arg[11], arg[12], arg[13], arg[14], arg[15]);
+		}
 #ifdef DHD_LOG_PRINT_RATE_LIMIT
 		log_print_count++;
 #endif /* DHD_LOG_PRINT_RATE_LIMIT */
@@ -2044,6 +2049,7 @@ dhd_dbg_monitor_get_tx_pkts(dhd_pub_t *dhdp, void __user *user_buf,
 	tx_report = dhdp->dbg->pkt_mon.tx_report;
 	tx_pkt = tx_report->tx_pkts;
 	pkt_count = MIN(req_count, tx_report->status_pos);
+	DHD_PKT_MON_UNLOCK(dhdp->dbg->pkt_mon_lock, flags);
 
 #ifdef CONFIG_COMPAT
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0))
@@ -2094,7 +2100,6 @@ dhd_dbg_monitor_get_tx_pkts(dhd_pub_t *dhdp, void __user *user_buf,
 	}
 	*resp_count = pkt_count;
 
-	DHD_PKT_MON_UNLOCK(dhdp->dbg->pkt_mon_lock, flags);
 	if (!pkt_count) {
 		DHD_ERROR(("%s(): no tx_status in tx completion messages, "
 			"make sure that 'd11status' is enabled in firmware, "
@@ -2138,6 +2143,7 @@ dhd_dbg_monitor_get_rx_pkts(dhd_pub_t *dhdp, void __user *user_buf,
 	rx_report = dhdp->dbg->pkt_mon.rx_report;
 	rx_pkt = rx_report->rx_pkts;
 	pkt_count = MIN(req_count, rx_report->pkt_pos);
+	DHD_PKT_MON_UNLOCK(dhdp->dbg->pkt_mon_lock, flags);
 
 #ifdef CONFIG_COMPAT
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0))
@@ -2189,7 +2195,6 @@ dhd_dbg_monitor_get_rx_pkts(dhd_pub_t *dhdp, void __user *user_buf,
 	}
 
 	*resp_count = pkt_count;
-	DHD_PKT_MON_UNLOCK(dhdp->dbg->pkt_mon_lock, flags);
 
 	return BCME_OK;
 }

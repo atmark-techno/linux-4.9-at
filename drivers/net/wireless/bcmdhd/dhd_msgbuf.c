@@ -39,11 +39,7 @@
 #include <dhd.h>
 #include <dhd_proto.h>
 
-#ifdef BCMDBUS
-#include <dbus.h>
-#else
 #include <dhd_bus.h>
-#endif /* BCMDBUS */
 
 #include <dhd_dbg.h>
 #include <siutils.h>
@@ -4156,10 +4152,11 @@ dhd_prot_init(dhd_pub_t *dhd)
 	* only if dongle does not support EDL
 	*/
 #ifdef EWP_EDL
-	if (dhd->bus->api.fw_rev >= PCIE_SHARED_VERSION_6 && !dhd->dongle_edl_support) {
+	if (dhd->bus->api.fw_rev >= PCIE_SHARED_VERSION_6 && !dhd->dongle_edl_support)
 #else
-	if (dhd->bus->api.fw_rev >= PCIE_SHARED_VERSION_6) {
+	if (dhd->bus->api.fw_rev >= PCIE_SHARED_VERSION_6)
 #endif /* EWP_EDL */
+	{
 		if ((ret = dhd_prot_init_info_rings(dhd)) != BCME_OK) {
 			/* For now log and proceed, further clean up action maybe necessary
 			 * when we have more clarity.
@@ -7428,6 +7425,7 @@ dhd_prot_ioctcmplt_process(dhd_pub_t *dhd, void *msg)
 #ifdef REPORT_FATAL_TIMEOUTS
 	uint16	dhd_xt_id;
 #endif
+	int ret = 0;
 
 	/* Check for ioctl timeout induce flag, which is set by firing
 	 * dhd iovar to induce IOCTL timeout. If flag is set,
@@ -7520,11 +7518,18 @@ dhd_prot_ioctcmplt_process(dhd_pub_t *dhd, void *msg)
 		pkt_id, xt_id, prot->ioctl_status, prot->ioctl_resplen));
 
 	if (prot->ioctl_resplen > 0) {
+		uint16 copy_len = MIN(prot->ioctl_resplen, prot->retbuf.len);
 #ifndef IOCTLRESP_USE_CONSTMEM
-		bcopy(PKTDATA(dhd->osh, pkt), prot->retbuf.va, prot->ioctl_resplen);
+		ret = memcpy_s(prot->retbuf.va, prot->retbuf.len, PKTDATA(dhd->osh, pkt), copy_len);
 #else
-		bcopy(pkt, prot->retbuf.va, prot->ioctl_resplen);
+		ret = memcpy_s(prot->retbuf.va, prot->retbuf.len, pkt, copy_len);
 #endif /* !IOCTLRESP_USE_CONSTMEM */
+		if (ret) {
+			DHD_ERROR(("memcpy failed:%d, destsz:%d, n:%u\n",
+				ret, prot->retbuf.len, copy_len));
+			dhd_wakeup_ioctl_event(dhd, IOCTL_RETURN_ON_ERROR);
+			goto exit;
+		}
 	}
 
 	/* wake up any dhd_os_ioctl_resp_wait() */
@@ -13650,8 +13655,9 @@ dhd_prot_debug_info_print(dhd_pub_t *dhd)
 		prot->device_ipc_version,
 		prot->host_ipc_version,
 		prot->active_ipc_version));
-	DHD_ERROR(("d2h_intr_method -> %s\n",
-			dhd->bus->d2h_intr_method ? "PCIE_MSI" : "PCIE_INTX"));
+	DHD_ERROR(("d2h_intr_method -> %s d2h_intr_control -> %s\n",
+			dhd->bus->d2h_intr_method ? "PCIE_MSI" : "PCIE_INTX",
+			dhd->bus->d2h_intr_control ? "HOST_IRQ" : "D2H_INTMASK"));
 	DHD_ERROR(("max Host TS bufs to post: %d, posted %d\n",
 		prot->max_tsbufpost, prot->cur_ts_bufs_posted));
 	DHD_ERROR(("max INFO bufs to post: %d, posted %d\n",

@@ -53,7 +53,7 @@
 
 #define SDIOH_ASSERT(exp) \
 	do { if (!(exp)) \
-		pr_err("!!!ASSERT fail: file %s lines %d", __FILE__, __LINE__); \
+		printf("!!!ASSERT fail: file %s lines %d", __FILE__, __LINE__); \
 	} while (0)
 
 #define BLOCK_SIZE_F1		64

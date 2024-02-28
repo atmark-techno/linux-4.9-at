@@ -83,35 +83,51 @@ static int sdioh_probe(struct sdio_func *func)
 	osl_t *osh = NULL;
 	sdioh_info_t *sdioh = NULL;
 
-	sd_err(("bus num (host idx)=%d, slot num (rca)=%d\n", host_idx, rca));
+	sd_err(("bus num (host idx)=%d, slot num (rca)=%d, caps=0x%x\n",
+		host_idx, rca, func->card->host->caps));
 	adapter = dhd_wifi_platform_get_adapter(SDIO_BUS, host_idx, rca);
 	if (adapter != NULL) {
 		sd_err(("found adapter info '%s'\n", adapter->name));
+		adapter->bus_type = SDIO_BUS;
+		adapter->bus_num = host_idx;
+		adapter->slot_num = rca;
 		adapter->sdio_func = func;
-	} else
+	} else {
 		sd_err(("can't find adapter info for this chip\n"));
+#ifdef ADAPTER_IDX
+		goto fail;
+#endif
+	}
 
 #ifdef WL_CFG80211
 	wl_cfg80211_set_parent_dev(&func->dev);
 #endif
 
-	 /* allocate SDIO Host Controller state info */
-	 osh = osl_attach(&func->dev, SDIO_BUS, TRUE);
-	 if (osh == NULL) {
-		 sd_err(("%s: osl_attach failed\n", __FUNCTION__));
-		 goto fail;
-	 }
-	 osl_static_mem_init(osh, adapter);
-	 sdioh = sdioh_attach(osh, func);
-	 if (sdioh == NULL) {
-		 sd_err(("%s: sdioh_attach failed\n", __FUNCTION__));
-		 goto fail;
-	 }
-	 sdioh->bcmsdh = bcmsdh_probe(osh, &func->dev, sdioh, adapter, SDIO_BUS, host_idx, rca);
-	 if (sdioh->bcmsdh == NULL) {
-		 sd_err(("%s: bcmsdh_probe failed\n", __FUNCTION__));
-		 goto fail;
-	 }
+	/* allocate SDIO Host Controller state info */
+	osh = osl_attach(&func->dev, SDIO_BUS, TRUE);
+	if (osh == NULL) {
+		sd_err(("%s: osl_attach failed\n", __FUNCTION__));
+		goto fail;
+	}
+	osl_static_mem_init(osh, adapter);
+	sdioh = sdioh_attach(osh, func);
+	if (sdioh == NULL) {
+		sd_err(("%s: sdioh_attach failed\n", __FUNCTION__));
+		goto fail;
+	}
+	if (!(func->card->host->caps & MMC_CAP_NONREMOVABLE)) {
+		sd_err(("%s: MMC_CAP_NONREMOVABLE not enabled in SDIO driver\n", __FUNCTION__));
+//		func->card->host->caps |= MMC_CAP_NONREMOVABLE;
+	}
+	if ((func->card->host->caps & MMC_CAP_NEEDS_POLL)) {
+		sd_err(("%s: MMC_CAP_NEEDS_POLL enabled in SDIO driver\n", __FUNCTION__));
+//		func->card->host->caps &= ~MMC_CAP_NEEDS_POLL;
+	}
+	sdioh->bcmsdh = bcmsdh_probe(osh, &func->dev, sdioh, adapter, SDIO_BUS, host_idx, rca);
+	if (sdioh->bcmsdh == NULL) {
+		sd_err(("%s: bcmsdh_probe failed\n", __FUNCTION__));
+		goto fail;
+	}
 
 	sdio_set_drvdata(func, sdioh);
 	return 0;

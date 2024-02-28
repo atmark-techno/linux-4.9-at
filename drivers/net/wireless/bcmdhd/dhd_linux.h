@@ -67,9 +67,9 @@
 /* dongle status */
 enum wifi_adapter_status {
 	WIFI_STATUS_POWER_ON = 0,
-	WIFI_STATUS_ATTACH,
 	WIFI_STATUS_FW_READY,
-	WIFI_STATUS_DETTACH
+	WIFI_STATUS_NET_ATTACHED,
+	WIFI_STATUS_BUS_DISCONNECTED
 };
 #define wifi_chk_adapter_status(adapter, stat) (test_bit(stat, &(adapter)->status))
 #define wifi_get_adapter_status(adapter, stat) (test_bit(stat, &(adapter)->status))
@@ -92,6 +92,11 @@ typedef struct wifi_adapter_info {
 	uint		bus_type;
 	uint		bus_num;
 	uint		slot_num;
+	int			index;
+	int 		gpio_wl_reg_on;
+#ifdef CUSTOMER_OOB
+	int 		gpio_wl_host_wake;
+#endif
 	wait_queue_head_t status_event;
 	unsigned long status;
 #if defined (BT_OVER_SDIO)
@@ -104,6 +109,9 @@ typedef struct wifi_adapter_info {
 	struct pci_dev *pci_dev;
 	struct pci_saved_state *pci_saved_state;
 #endif /* BCMPCIE */
+#ifdef BCMDHD_PLATDEV
+	struct platform_device *pdev;
+#endif /* BCMDHD_PLATDEV */
 } wifi_adapter_info_t;
 
 #if defined(CONFIG_WIFI_CONTROL_FUNC) || defined(CUSTOMER_HW4)
@@ -402,6 +410,9 @@ typedef struct dhd_if {
 	bool recv_reassoc_evt;
 	bool post_roam_evt;
 #endif /* DHD_POST_EAPOL_M1_AFTER_ROAM_EVT */
+#ifdef WLDWDS
+	bool dwds;	/* DWDS interface */
+#endif /* WLDWDS */
 #ifdef WLEASYMESH
 	uint8 _1905_al_ucast[ETHER_ADDR_LEN];
 	uint8 _1905_al_mcast[ETHER_ADDR_LEN];
@@ -470,7 +481,7 @@ wifi_adapter_info_t* dhd_wifi_platform_get_adapter(uint32 bus_type, uint32 bus_n
 int wifi_platform_set_power(wifi_adapter_info_t *adapter, bool on, unsigned long msec);
 int wifi_platform_bus_enumerate(wifi_adapter_info_t *adapter, bool device_present);
 int wifi_platform_get_irq_number(wifi_adapter_info_t *adapter, unsigned long *irq_flags_ptr);
-int wifi_platform_get_mac_addr(wifi_adapter_info_t *adapter, unsigned char *buf, char *name);
+int wifi_platform_get_mac_addr(wifi_adapter_info_t *adapter, unsigned char *buf, int ifidx);
 #ifdef DHD_COREDUMP
 int wifi_platform_set_coredump(wifi_adapter_info_t *adapter, const char *buf, int buf_len,
 	const char *info);

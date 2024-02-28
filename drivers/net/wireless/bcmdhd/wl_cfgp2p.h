@@ -140,21 +140,20 @@ enum wl_cfgp2p_status {
  * but it can be regarded as real error case for Tester
  */
 #ifdef CUSTOMER_HW4_DEBUG
-#define CFGP2P_ERROR_TEXT		DHD_LOG_PREFIXS "CFGP2P-INFO2) "
+#define CFGP2P_ERROR_TEXT		"CFGP2P-INFO2) "
 #else
-#define CFGP2P_ERROR_TEXT		DHD_LOG_PREFIXS "CFGP2P-ERROR) "
+#define CFGP2P_ERROR_TEXT		"CFGP2P-ERROR) "
 #endif /* CUSTOMER_HW4_DEBUG */
-#define CFGP2P_INFO_TEXT		DHD_LOG_PREFIXS "CFGP2P-INFO) "
-#define CFGP2P_ACTION_TEXT		DHD_LOG_PREFIXS "CFGP2P-ACTION) "
-#define CFGP2P_DEBUG_TEXT		DHD_LOG_PREFIXS "CFGP2P-DEBUG) "
+#define CFGP2P_INFO_TEXT		"CFGP2P-INFO) "
+#define CFGP2P_ACTION_TEXT		"CFGP2P-ACTION) "
+#define CFGP2P_DEBUG_TEXT		"CFGP2P-DEBUG) "
 #endif /* defined(CUSTOMER_DBG_PREFIX_ENABLE) */
 
 #ifdef DHD_LOG_DUMP
 #define	CFGP2P_ERR_MSG(x, args...)									\
 	do {										\
 		if (wl_dbg_level & WL_DBG_ERR) {				\
-			WL_DBG_PRINT_SYSTEM_TIME;				\
-			pr_cont(CFGP2P_ERROR_TEXT "%s : " x, __func__, ## args);	\
+			printf(CFGP2P_ERROR_TEXT "%s : " x, __func__, ## args);	\
 			DHD_LOG_DUMP_WRITE_TS_FN;	\
 			DHD_LOG_DUMP_WRITE(x, ## args);	\
 		}									\
@@ -163,8 +162,7 @@ enum wl_cfgp2p_status {
 #define	CFGP2P_INFO_MSG(x, args...)									\
 	do {										\
 		if (wl_dbg_level & WL_DBG_INFO) {				\
-			WL_DBG_PRINT_SYSTEM_TIME;				\
-			pr_cont(CFGP2P_INFO_TEXT "%s : " x, __func__, ## args);	\
+			printf(CFGP2P_INFO_TEXT "%s : " x, __func__, ## args);	\
 			DHD_LOG_DUMP_WRITE_TS_FN;	\
 			DHD_LOG_DUMP_WRITE(x, ## args);	\
 		}									\
@@ -173,8 +171,7 @@ enum wl_cfgp2p_status {
 #define	CFGP2P_ACTION_MSG(x, args...)								\
 	do {									\
 		if (wl_dbg_level & WL_DBG_P2P_ACTION) {			\
-			WL_DBG_PRINT_SYSTEM_TIME;				\
-			pr_cont(CFGP2P_ACTION_TEXT "%s : " x, __func__, ## args);	\
+			printf(CFGP2P_ACTION_TEXT "%s : " x, __func__, ## args);	\
 			DHD_LOG_DUMP_WRITE_TS_FN;	\
 			DHD_LOG_DUMP_WRITE(x, ## args);	\
 		}									\
@@ -184,24 +181,21 @@ enum wl_cfgp2p_status {
 #define CFGP2P_ERR_MSG(x, args...)									\
 	do {										\
 		if (wl_dbg_level & WL_DBG_ERR) {				\
-			WL_DBG_PRINT_SYSTEM_TIME;				\
-			pr_cont(CFGP2P_ERROR_TEXT "%s : " x, __func__, ## args);	\
+			printf(CFGP2P_ERROR_TEXT "%s : " x, __func__, ## args);	\
 		}									\
 	} while (0)
 #define CFGP2P_ERR(x) CFGP2P_ERR_MSG x
 #define	CFGP2P_INFO_MSG(x, args...)									\
 	do {										\
 		if (wl_dbg_level & WL_DBG_INFO) {				\
-			WL_DBG_PRINT_SYSTEM_TIME;				\
-			pr_cont(CFGP2P_INFO_TEXT "%s : " x, __func__, ## args);	\
+			printf(CFGP2P_INFO_TEXT "%s : " x, __func__, ## args);	\
 		}									\
 	} while (0)
 #define CFGP2P_INFO(x) CFGP2P_INFO_MSG x
 #define	CFGP2P_ACTION_MSG(x, args...)								\
 	do {									\
 		if (wl_dbg_level & WL_DBG_P2P_ACTION) {			\
-			WL_DBG_PRINT_SYSTEM_TIME;				\
-			pr_cont(CFGP2P_ACTION_TEXT "%s : " x, __func__, ## args);	\
+			printf(CFGP2P_ACTION_TEXT "%s : " x, __func__, ## args);	\
 		}									\
 	} while (0)
 #define CFGP2P_ACTION(x) CFGP2P_ACTION_MSG x
@@ -210,8 +204,7 @@ enum wl_cfgp2p_status {
 #define	CFGP2P_DBG_MSG(x, args...)								\
 	do {									\
 		if (wl_dbg_level & WL_DBG_DBG) {			\
-			WL_DBG_PRINT_SYSTEM_TIME;				\
-			pr_cont(CFGP2P_DEBUG_TEXT "%s : " x, __func__, ## args);	\
+			printf(CFGP2P_DEBUG_TEXT "%s : " x, __func__, ## args);	\
 		}									\
 	} while (0)
 #define CFGP2P_DBG(x) CFGP2P_DBG_MSG x
@@ -229,7 +222,7 @@ enum wl_cfgp2p_status {
 #endif
 #endif
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 2, 0))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0))
 #ifdef WL_CFG80211_STA_EVENT
 #undef WL_CFG80211_STA_EVENT
 #endif
@@ -492,4 +485,9 @@ wl_cfgp2p_is_p2p_specific_scan(struct cfg80211_scan_request *request);
  * instead of channel in actframe iovar.
  */
 #define FW_MAJOR_VER_ACTFRAME_CHSPEC    14
+
+#ifdef BCMDBUS
+int
+wl_cfgp2p_start_p2p_device_resume(dhd_pub_t *dhd);
+#endif /* BCMDBUS */
 #endif				/* _wl_cfgp2p_h_ */

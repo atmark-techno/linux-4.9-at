@@ -450,6 +450,7 @@ wl_cfgp2p_ifadd(struct bcm_cfg80211 *cfg, struct ether_addr *mac, u8 if_type,
 	s32 err;
 	struct net_device *ndev = bcmcfg_to_prmry_ndev(cfg);
 
+	memset(&ifreq, 0, sizeof(wl_p2p_if_t));
 	ifreq.type = if_type;
 	ifreq.chspec = chspec;
 	memcpy(ifreq.addr.octet, mac->octet, sizeof(ifreq.addr.octet));
@@ -526,6 +527,7 @@ wl_cfgp2p_ifchange(struct bcm_cfg80211 *cfg, struct ether_addr *mac, u8 if_type,
 
 	struct net_device *netdev =  wl_to_p2p_bss_ndev(cfg, conn_idx);
 
+	memset(&ifreq, 0, sizeof(wl_p2p_if_t));
 	ifreq.type = if_type;
 	ifreq.chspec = chspec;
 	memcpy(ifreq.addr.octet, mac->octet, sizeof(ifreq.addr.octet));
@@ -637,6 +639,7 @@ wl_cfgp2p_set_p2p_mode(struct bcm_cfg80211 *cfg, u8 mode, u32 channel, u16 liste
 #endif /* P2PLISTEN_AP_SAMECHN */
 
 	/* Put the WL driver into P2P Listen Mode to respond to P2P probe reqs */
+	memset(&discovery_mode, 0, sizeof(wl_p2p_disc_st_t));
 	discovery_mode.state = mode;
 	discovery_mode.chspec = wl_ch_host_to_driver(channel);
 	discovery_mode.dwell = listen_ms;
@@ -705,7 +708,12 @@ wl_cfgp2p_init_discovery(struct bcm_cfg80211 *cfg)
 	BCM_REFERENCE(ndev);
 	CFGP2P_DBG(("enter\n"));
 
-	if (wl_to_p2p_bss_bssidx(cfg, P2PAPI_BSSCFG_DEVICE) > 0) {
+#ifdef BCMDBUS
+	if (wl_to_p2p_bss_bssidx(cfg, P2PAPI_BSSCFG_DEVICE) > 0 && !cfg->bus_resuming)
+#else
+	if (wl_to_p2p_bss_bssidx(cfg, P2PAPI_BSSCFG_DEVICE) > 0)
+#endif /* BCMDBUS */
+	{
 		CFGP2P_ERR(("do nothing, already initialized\n"));
 		goto exit;
 	}
@@ -732,6 +740,9 @@ wl_cfgp2p_init_discovery(struct bcm_cfg80211 *cfg)
 	 * so that time, the ifidx returned in WLC_E_IF should be used for populating
 	 * the netinfo
 	 */
+#ifdef BCMDBUS
+	if (!cfg->bus_resuming)
+#endif /* BCMDBUS */
 	ret = wl_alloc_netinfo(cfg, NULL, cfg->p2p_wdev, WL_IF_TYPE_STA, 0, bssidx, 0);
 	if (unlikely(ret)) {
 		goto exit;
@@ -822,7 +833,12 @@ wl_cfgp2p_enable_discovery(struct bcm_cfg80211 *cfg, struct net_device *dev,
 	}
 #endif /* WL_IFACE_MGMT */
 
-	if (wl_get_p2p_status(cfg, DISCOVERY_ON)) {
+#ifdef BCMDBUS
+	if (!cfg->bus_resuming && (wl_get_p2p_status(cfg, DISCOVERY_ON)))
+#else
+	if (wl_get_p2p_status(cfg, DISCOVERY_ON))
+#endif /* BCMDBUS */
+	{
 		CFGP2P_DBG((" DISCOVERY is already initialized, we have nothing to do\n"));
 		goto set_ie;
 	}
@@ -1112,9 +1128,9 @@ wl_cfgp2p_escan(struct bcm_cfg80211 *cfg, struct net_device *dev, u16 active_sca
 	}
 	CFGP2P_DBG(("\n"));
 
+	WL_MSG(dev->name, "P2P_SEARCH sync ID: %d, bssidx: %d\n", sync_id, bssidx);
 	ret = wldev_iovar_setbuf_bsscfg(pri_dev, "p2p_scan",
 		memblk, memsize, cfg->ioctl_buf, WLC_IOCTL_MAXLEN, bssidx, &cfg->ioctl_buf_sync);
-	WL_MSG(dev->name, "P2P_SEARCH sync ID: %d, bssidx: %d\n", sync_id, bssidx);
 	if (ret == BCME_OK) {
 		wl_set_p2p_status(cfg, SCANNING);
 	}
@@ -1289,6 +1305,8 @@ wl_cfgp2p_vndr_ie(struct bcm_cfg80211 *cfg, u8 *iebuf, s32 pktflag,
 		CFGP2P_ERR(("p2pwl_vndr_ie: Invalid packet flag 0x%x\n", pktflag));
 		return -1;
 	}
+
+	memset(&hdr, 0, sizeof(vndr_ie_setbuf_t));
 
 	/* Copy the vndr_ie SET command ("add"/"del") to the buffer */
 	strlcpy(hdr.cmd, add_del_cmd, sizeof(hdr.cmd));
@@ -1789,6 +1807,9 @@ wl_cfgp2p_generate_bss_mac(struct bcm_cfg80211 *cfg, struct ether_addr *primary_
 {
 	struct ether_addr *mac_addr = wl_to_p2p_bss_macaddr(cfg, P2PAPI_BSSCFG_DEVICE);
 	struct ether_addr *int_addr;
+#ifdef P2P_AP_CONCURRENT
+	dhd_pub_t *dhd = (dhd_pub_t *)(cfg->pub);
+#endif
 
 	if (ETHER_IS_LOCALADDR(primary_addr)) {
 		/* STA is using locally administered MAC. Use randomized mac
@@ -1798,6 +1819,10 @@ wl_cfgp2p_generate_bss_mac(struct bcm_cfg80211 *cfg, struct ether_addr *primary_
 	} else {
 		(void)memcpy_s(mac_addr, ETH_ALEN, bcmcfg_to_prmry_ndev(cfg)->perm_addr, ETH_ALEN);
 		mac_addr->octet[0] |= 0x02;
+#ifdef P2P_AP_CONCURRENT
+		if (dhd->conf->war & P2P_AP_MAC_CONFLICT)
+			wl_ext_iapsta_get_vif_macaddr(dhd, 2, (u8 *)mac_addr);
+#endif
 		WL_DBG(("P2P Discovery address:"MACDBG "\n", MAC2STRDBG(mac_addr->octet)));
 	}
 
@@ -2396,7 +2421,7 @@ wl_cfgp2p_register_ndev(struct bcm_cfg80211 *cfg)
 #endif
 
 	/* Register with a dummy MAC addr */
-	memcpy(net->dev_addr, temp_addr, ETHER_ADDR_LEN);
+	dev_addr_set(net, temp_addr);
 
 #ifndef	WL_NEWCFG_PRIVCMD_SUPPORT
 	wdev->wiphy = cfg->wdev->wiphy;
@@ -2615,15 +2640,13 @@ wl_cfgp2p_add_p2p_disc_if(struct bcm_cfg80211 *cfg)
 
 #if defined(WL_NEWCFG_PRIVCMD_SUPPORT)
 	if (cfg->p2p_net)
-		memcpy(cfg->p2p_net->dev_addr, wl_to_p2p_bss_macaddr(cfg, P2PAPI_BSSCFG_DEVICE),
-			ETHER_ADDR_LEN);
+		dev_addr_set(cfg->p2p_net, wl_to_p2p_bss_macaddr(cfg, P2PAPI_BSSCFG_DEVICE));
 #endif /* WL_NEWCFG_PRIVCMD_SUPPORT */
 
 	/* store p2p wdev ptr for further reference. */
 	cfg->p2p_wdev = wdev;
 
 	printf("P2P interface registered\n");
-	printf("%s: wdev: %p, wdev->net: %p\n", __FUNCTION__, wdev, wdev->netdev);
 	return wdev;
 }
 
@@ -2643,7 +2666,7 @@ wl_cfgp2p_start_p2p_device(struct wiphy *wiphy, struct wireless_dev *wdev)
 #ifdef WL_IFACE_MGMT
 	if (wl_cfg80211_get_sec_iface(cfg) != WL_IFACE_NOT_PRESENT) {
 		/* Delay fw initialization till actual discovery. */
-		CFGP2P_INFO(("SEC IFACE present. Initialize p2p from discovery context\n"));
+		CFGP2P_ERR(("SEC IFACE present. Initialize p2p from discovery context\n"));
 		return BCME_OK;
 	}
 #endif /* WL_IFACE_MGMT */
@@ -2665,7 +2688,7 @@ wl_cfgp2p_start_p2p_device(struct wiphy *wiphy, struct wireless_dev *wdev)
 	cfg->p2p_prb_noti = false;
 #endif
 
-	CFGP2P_DBG(("P2P interface started\n"));
+	printf("P2P interface started\n");
 
 exit:
 	return ret;
@@ -2713,7 +2736,7 @@ wl_cfgp2p_stop_p2p_device(struct wiphy *wiphy, struct wireless_dev *wdev)
 
 	p2p_on(cfg) = false;
 
-	CFGP2P_DBG(("Exit. P2P interface stopped\n"));
+	printf("Exit. P2P interface stopped\n");
 
 	return;
 }
@@ -2803,3 +2826,36 @@ wl_cfgp2p_is_p2p_specific_scan(struct cfg80211_scan_request *request)
 	}
 	return false;
 }
+
+#ifdef BCMDBUS
+int
+wl_cfgp2p_start_p2p_device_resume(dhd_pub_t *dhd)
+{
+	int ret = 0;
+#ifdef WL_CFG80211_P2P_DEV_IF
+	struct net_device *primary_ndev = dhd_linux_get_primary_netdev(dhd);
+	struct bcm_cfg80211 *cfg;
+	struct wiphy *wiphy;
+
+	if (!primary_ndev)
+		return -EINVAL;
+	cfg = wl_get_cfg(primary_ndev);
+	if (!cfg)
+		return -EINVAL;
+
+	RETURN_EIO_IF_NOT_UP(cfg);
+	if (!p2p_on(cfg))
+		return -EINVAL;
+
+	rtnl_lock();
+	wiphy = bcmcfg_to_wiphy(cfg);
+	cfg->bus_resuming = TRUE;
+	ret = wl_cfgp2p_start_p2p_device(wiphy, cfg->wdev);
+	cfg->bus_resuming = FALSE;
+	printf("P2P interface resumed\n");
+	rtnl_unlock();
+#endif
+
+	return ret;
+}
+#endif /* BCMDBUS */

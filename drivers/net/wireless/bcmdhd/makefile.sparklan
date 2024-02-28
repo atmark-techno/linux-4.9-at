@@ -31,11 +31,6 @@ KBUILD_OPTIONS += CONFIG_BCMDHD_SDIO_IRQ=y
 #KBUILD_OPTIONS += CONFIG_SparkLAN_SDTXGLOM_MDSEC=y
 endif
 
-KBUILD_OPTIONS += CONFIG_OUT_OF_KERNEL=y
-#KBUILD_OPTIONS += CONFIG_BCMDHD_FW_PATH="/lib/firmware/bcmdhd/"
-#KBUILD_OPTIONS += CONFIG_BCMDHD_NVRAM_PATH="/lib/firmware/bcmdhd/"
-# the path set in the dhd_config.h - default path is /lib/firmware/bcmdhd/
-
 all:
 	$(MAKE) -C $(KERNEL_SRC) M=$(shell pwd) modules $(KBUILD_OPTIONS)
 	cp bcmdhd.ko bcmdhd$(DRV).ko
