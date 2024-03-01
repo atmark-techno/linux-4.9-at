@@ -41,6 +41,7 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
+#include <linux/iopoll.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -438,7 +439,10 @@ static int i2c_imx_bus_busy(struct imx_i2c_struct *i2c_imx, int for_busy)
 				"<%s> I2C bus is busy\n", __func__);
 			return -ETIMEDOUT;
 		}
-		schedule();
+		if (in_atomic() || irqs_disabled())
+			udelay(100);
+		else
+			schedule();
 	}
 
 	return 0;
@@ -446,7 +450,26 @@ static int i2c_imx_bus_busy(struct imx_i2c_struct *i2c_imx, int for_busy)
 
 static int i2c_imx_trx_complete(struct imx_i2c_struct *i2c_imx)
 {
-	wait_event_timeout(i2c_imx->queue, i2c_imx->i2csr & I2SR_IIF, HZ / 10);
+	if (in_atomic() || irqs_disabled()) {
+		void __iomem *addr = i2c_imx->base + (IMX_I2C_I2SR << i2c_imx->hwdata->regshift);
+		unsigned int regval;
+
+		/*
+		 * The formula for the poll timeout is documented in the RM
+		 * Rev.5 on page 1878:
+		 *     T_min = 10/F_scl
+		 * Set the value hard as it is done for the non-atomic use-case.
+		 * Use 10 kHz for the calculation since this is the minimum
+		 * allowed SMBus frequency. Also add an offset of 100us since it
+		 * turned out that the I2SR_IIF bit isn't set correctly within
+		 * the minimum timeout in polling mode.
+		 */
+		readb_poll_timeout_atomic(addr, regval, regval & I2SR_IIF, 5, 1000 + 100);
+		i2c_imx->i2csr = regval;
+		imx_i2c_write_reg(0, i2c_imx, IMX_I2C_I2SR);
+	} else {
+		wait_event_timeout(i2c_imx->queue, i2c_imx->i2csr & I2SR_IIF, HZ / 10);
+	}
 
 	if (unlikely(!(i2c_imx->i2csr & I2SR_IIF))) {
 		dev_dbg(&i2c_imx->adapter.dev, "<%s> Timeout\n", __func__);
@@ -526,7 +549,10 @@ static int i2c_imx_start(struct imx_i2c_struct *i2c_imx)
 	imx_i2c_write_reg(i2c_imx->hwdata->i2cr_ien_opcode, i2c_imx, IMX_I2C_I2CR);
 
 	/* Wait controller to be stable */
-	usleep_range(50, 150);
+	if (in_atomic() || irqs_disabled())
+		udelay(50);
+	else
+		usleep_range(50, 150);
 
 	/* Start I2C transaction */
 	temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
@@ -538,6 +564,9 @@ static int i2c_imx_start(struct imx_i2c_struct *i2c_imx)
 	i2c_imx->stopped = 0;
 
 	temp |= I2CR_IIEN | I2CR_MTX | I2CR_TXAK;
+	if (in_atomic() || irqs_disabled())
+		temp &= ~I2CR_IIEN; /* Disable interrupt */
+
 	temp &= ~I2CR_DMAEN;
 	imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
 	return result;
@@ -895,7 +924,7 @@ static int i2c_imx_xfer(struct i2c_adapter *adapter,
 	/* Start I2C transfer */
 	result = i2c_imx_start(i2c_imx);
 	if (result) {
-		if (i2c_imx->adapter.bus_recovery_info) {
+		if (!in_atomic() && !irqs_disabled() && i2c_imx->adapter.bus_recovery_info) {
 			i2c_recover_bus(&i2c_imx->adapter);
 			result = i2c_imx_start(i2c_imx);
 		}
@@ -939,10 +968,11 @@ static int i2c_imx_xfer(struct i2c_adapter *adapter,
 			(temp & I2SR_SRW ? 1 : 0), (temp & I2SR_IIF ? 1 : 0),
 			(temp & I2SR_RXAK ? 1 : 0));
 #endif
-		if (msgs[i].flags & I2C_M_RD)
+		if (msgs[i].flags & I2C_M_RD) {
 			result = i2c_imx_read(i2c_imx, &msgs[i], is_lastmsg);
-		else {
-			if (i2c_imx->dma && msgs[i].len >= DMA_THRESHOLD)
+		} else {
+			if (!in_atomic() && !irqs_disabled() &&
+			    i2c_imx->dma && msgs[i].len >= DMA_THRESHOLD)
 				result = i2c_imx_dma_write(i2c_imx, &msgs[i]);
 			else
 				result = i2c_imx_write(i2c_imx, &msgs[i]);
