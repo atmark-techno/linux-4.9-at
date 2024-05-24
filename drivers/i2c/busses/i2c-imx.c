@@ -460,11 +460,11 @@ static int i2c_imx_trx_complete(struct imx_i2c_struct *i2c_imx)
 		 *     T_min = 10/F_scl
 		 * Set the value hard as it is done for the non-atomic use-case.
 		 * Use 10 kHz for the calculation since this is the minimum
-		 * allowed SMBus frequency. Also add an offset of 100us since it
+		 * allowed SMBus frequency. Also add an offset of 2000us since it
 		 * turned out that the I2SR_IIF bit isn't set correctly within
 		 * the minimum timeout in polling mode.
 		 */
-		readb_poll_timeout_atomic(addr, regval, regval & I2SR_IIF, 5, 1000 + 100);
+		readb_poll_timeout_atomic(addr, regval, regval & I2SR_IIF, 5, 1000 + 2000);
 		i2c_imx->i2csr = regval;
 		imx_i2c_write_reg(0, i2c_imx, IMX_I2C_I2SR);
 	} else {
