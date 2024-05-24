@@ -37,6 +37,7 @@ static int gpio_bmic_gpio_direction_output(struct gpio_chip *gc,
 	struct gpio_bmic *gpio;
 	u8 output;
 	int ret = 0;
+	union i2c_smbus_data data;
 	bool atomic_context = in_atomic() || irqs_disabled();
 
 	gpio = gpiochip_get_data(gc);
@@ -53,7 +54,22 @@ static int gpio_bmic_gpio_direction_output(struct gpio_chip *gc,
 	if (output == gpio->reg_output)
 		goto exit;
 
-	ret = i2c_smbus_write_byte_data(gpio->client, REG_VALUE, output);
+	if (!atomic_context)
+		ret = i2c_smbus_write_byte_data(gpio->client,
+						REG_VALUE, output);
+	else {
+	       /*
+		* Use unlocked flavor of i2c_smbus_xfer to avoid scenario where
+		* i2c bus might be previously locked by some process unable to
+		* release the lock due to interrupts already being disabled at
+		* this late stage.
+		*/
+		data.byte = output;
+		ret = __i2c_smbus_xfer(gpio->client->adapter,
+				       gpio->client->addr, gpio->client->flags,
+				       I2C_SMBUS_WRITE, REG_VALUE,
+				       I2C_SMBUS_BYTE_DATA, &data);
+	}
 	if (ret < 0)
 		goto exit;
 
