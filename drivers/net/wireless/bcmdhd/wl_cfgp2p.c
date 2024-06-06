@@ -2844,7 +2844,7 @@ wl_cfgp2p_start_p2p_device_resume(dhd_pub_t *dhd)
 		return -EINVAL;
 
 	RETURN_EIO_IF_NOT_UP(cfg);
-	if (!p2p_on(cfg))
+	if (!p2p_is_on(cfg))
 		return -EINVAL;
 
 	rtnl_lock();

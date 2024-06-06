@@ -2607,7 +2607,7 @@ wl_iftype_to_str(int wl_iftype)
 #define scan_req_match(cfg)	(((cfg) && (cfg->scan_request) && \
 	(cfg->scan_request->dev == cfg->p2p_net)) ? true : false)
 #else
-#define scan_req_match(cfg)	(((cfg) && p2p_is_on(cfg) && p2p_scan(cfg)) ? \
+#define scan_req_match(cfg)	(((cfg) && p2p_is_on(cfg) && p2p_is_scan(cfg)) ? \
 	true : false)
 #endif /* WL_CFG80211_P2P_DEV_IF */
 

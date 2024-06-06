@@ -523,7 +523,7 @@ void wl_cfg80211_update_bss_cache(struct bcm_cfg80211 *cfg)
 	wl_scan_results_t *bss_list = cfg->bss_list;
 
 	/* Free cache in p2p scanning*/
-	if (p2p_is_on(cfg) && p2p_scan(cfg)) {
+	if (p2p_is_on(cfg) && p2p_is_scan(cfg)) {
 #if defined(RSSIAVG)
 		wl_free_rssi_cache(&cfg->g_rssi_cache_ctrl);
 #endif
@@ -1286,7 +1286,7 @@ wl_escan_handler(struct bcm_cfg80211 *cfg, bcm_struct_cfgdev *cfgdev,
 			WL_INFORM_MEM(("ESCAN ABORTED\n"));
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0))
-			if (p2p_scan(cfg) && cfg->scan_request &&
+			if (p2p_is_scan(cfg) && cfg->scan_request &&
 				(cfg->scan_request->flags & NL80211_SCAN_FLAG_FLUSH)) {
 				WL_ERR(("scan list is changed"));
 				cfg->bss_list = wl_escan_get_buf(cfg, FALSE);
@@ -1627,7 +1627,7 @@ wl_cfgscan_populate_scan_channels(struct bcm_cfg80211 *cfg,
 	}
 
 	/* Check if request is for p2p scans */
-	is_p2p_scan = p2p_is_on(cfg) && p2p_scan(cfg);
+	is_p2p_scan = p2p_is_on(cfg) && p2p_is_scan(cfg);
 
 	for (i = 0; i < n_channels; i++) {
 		channel = ieee80211_frequency_to_channel(channels[i]->center_freq);
@@ -1990,7 +1990,7 @@ wl_run_escan(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 		params_size = (WL_SCAN_PARAMS_FIXED_SIZE + OFFSETOF(wl_escan_params_t, params));
 	}
 
-	if (!cfg->p2p_supported || !p2p_scan(cfg)) {
+	if (!cfg->p2p_supported || !p2p_is_scan(cfg)) {
 		/* LEGACY SCAN TRIGGER */
 		WL_SCAN((" LEGACY E-SCAN START\n"));
 
@@ -2126,7 +2126,7 @@ wl_run_escan(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 		}
 		MFREE(cfg->osh, params, params_size);
 	}
-	else if (p2p_is_on(cfg) && p2p_scan(cfg)) {
+	else if (p2p_is_on(cfg) && p2p_is_scan(cfg)) {
 		/* P2P SCAN TRIGGER */
 		if (request->n_channels) {
 			num_chans = request->n_channels;
@@ -2517,7 +2517,7 @@ __wl_cfg80211_scan(struct wiphy *wiphy, struct net_device *ndev,
 		if (p2p_ssid) {
 			if (cfg->p2p_supported) {
 				/* p2p scan trigger */
-				if (p2p_on(cfg) == false) {
+				if (p2p_is_on(cfg) == false) {
 					/* p2p on at the first time */
 					p2p_on(cfg) = true;
 					wl_cfgp2p_set_firm_p2p(cfg);
@@ -2539,7 +2539,7 @@ __wl_cfg80211_scan(struct wiphy *wiphy, struct net_device *ndev,
 				*  , we will do p2p scan using P2PAPI_BSSCFG_DEVICE.
 				*/
 
-				if (p2p_scan(cfg) == false) {
+				if (p2p_is_scan(cfg) == false) {
 					if (wl_get_p2p_status(cfg, DISCOVERY_ON)) {
 						err = wl_cfgp2p_discover_enable_search(cfg,
 						false);
@@ -2550,7 +2550,7 @@ __wl_cfg80211_scan(struct wiphy *wiphy, struct net_device *ndev,
 					}
 				}
 			}
-			if (!cfg->p2p_supported || !p2p_scan(cfg)) {
+			if (!cfg->p2p_supported || !p2p_is_scan(cfg)) {
 				if ((bssidx = wl_get_bssidx_by_wdev(cfg,
 					ndev->ieee80211_ptr)) < 0) {
 					WL_ERR(("Find p2p index from ndev(%p) failed\n",
@@ -2608,7 +2608,7 @@ __wl_cfg80211_scan(struct wiphy *wiphy, struct net_device *ndev,
 #endif
 
 	if (cfg->p2p_supported) {
-		if (request && p2p_on(cfg) && p2p_scan(cfg)) {
+		if (request && p2p_is_on(cfg) && p2p_is_scan(cfg)) {
 
 #ifdef WL_SDO
 			if (wl_get_p2p_status(cfg, DISC_IN_PROGRESS)) {
@@ -2938,7 +2938,7 @@ wl_notify_escan_complete(struct bcm_cfg80211 *cfg,
 #if defined (ESCAN_RESULT_PATCH)
 	if (likely(cfg->scan_request)) {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0))
-		if (aborted && cfg->p2p && p2p_scan(cfg) &&
+		if (aborted && p2p_is_scan(cfg) &&
 			(cfg->scan_request->flags & NL80211_SCAN_FLAG_FLUSH)) {
 			WL_ERR(("scan list is changed"));
 			cfg->bss_list = wl_escan_get_buf(cfg, !aborted);
