@@ -426,9 +426,6 @@ static void imx6_pcie_deassert_core_reset(struct imx6_pcie *imx6_pcie)
 	int ret;
 	u32 val;
 
-	if (gpio_is_valid(imx6_pcie->power_on_gpio))
-		gpio_set_value_cansleep(imx6_pcie->power_on_gpio, 1);
-
 	if (gpio_is_valid(imx6_pcie->clkreq_gpio))
 		gpio_direction_input(imx6_pcie->clkreq_gpio);
 
@@ -472,6 +469,9 @@ static void imx6_pcie_deassert_core_reset(struct imx6_pcie *imx6_pcie)
 
 	/* allow the clocks to stabilize */
 	udelay(200);
+
+	if (gpio_is_valid(imx6_pcie->power_on_gpio))
+		gpio_set_value_cansleep(imx6_pcie->power_on_gpio, 1);
 
 	switch (imx6_pcie->variant) {
 	case IMX6SX:
@@ -545,11 +545,16 @@ static void imx6_pcie_deassert_core_reset(struct imx6_pcie *imx6_pcie)
 		break;
 	}
 
+        if (gpio_is_valid(imx6_pcie->dis_gpio)) {
+              mdelay(15);
+              gpio_direction_output(imx6_pcie->dis_gpio, 1);
+        }
+
 	/* Some boards don't have PCIe reset GPIO. */
 	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
 		gpio_set_value_cansleep(imx6_pcie->reset_gpio,
 					imx6_pcie->gpio_active_high);
-		mdelay(20);
+		mdelay(35);
 		gpio_set_value_cansleep(imx6_pcie->reset_gpio,
 					!imx6_pcie->gpio_active_high);
 		mdelay(20);
@@ -576,11 +581,10 @@ static void imx6_pcie_init_phy(struct imx6_pcie *imx6_pcie)
 				   IMX6SX_GPR12_PCIE_RX_EQ_2);
 
 	if (imx6_pcie->variant == IMX7D) {
-		/* power on before ref clock are taken */
-		if (gpio_is_valid(imx6_pcie->power_on_gpio)) {
-			gpio_set_value(imx6_pcie->power_on_gpio, 1);
-			mdelay(1);
-		}
+        	if (gpio_is_valid(imx6_pcie->dis_gpio)) {
+              		mdelay(15);
+	                gpio_direction_output(imx6_pcie->dis_gpio, 1);
+        	}
 
 		/* Enable PCIe PHY 1P0D */
 		regulator_set_voltage(imx6_pcie->pcie_phy_regulator,
@@ -593,6 +597,12 @@ static void imx6_pcie_init_phy(struct imx6_pcie *imx6_pcie)
 		/* pcie phy ref clock select; 1? internal pll : external osc */
 		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
 				BIT(5), 0);
+
+		/* power on before ref clock are taken */
+		if (gpio_is_valid(imx6_pcie->power_on_gpio)) {
+			gpio_set_value(imx6_pcie->power_on_gpio, 1);
+			mdelay(2);
+		}
 	} else if (imx6_pcie->variant == IMX6SX) {
 		/* Force PCIe PHY reset */
 		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR5,
