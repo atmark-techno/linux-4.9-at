@@ -1239,7 +1239,7 @@ static int imx6_pcie_probe(struct platform_device *pdev)
 	imx6_pcie->dis_gpio = of_get_named_gpio(node, "disable-gpio", 0);
 	if (gpio_is_valid(imx6_pcie->dis_gpio)) {
 		unsigned long flags;
-		if (of_property_read_bool(np, "disable-gpio-open-drain"))
+		if (of_property_read_bool(node, "disable-gpio-open-drain"))
 			flags = GPIOF_IN;
 		else
 			flags = GPIOF_OUT_INIT_HIGH;
