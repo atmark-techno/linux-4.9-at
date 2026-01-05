@@ -1255,7 +1255,7 @@ static int imx6_pcie_probe(struct platform_device *pdev)
 	if (gpio_is_valid(imx6_pcie->clkreq_gpio)) {
 		ret = devm_gpio_request_one(&pdev->dev,
 					    imx6_pcie->clkreq_gpio,
-					    GPIOF_OUT_INIT_LOW,
+					    GPIOF_IN,
 					    "PCIe reference clock request.");
 		if (ret) {
 			dev_err(&pdev->dev, "unable to get clkreq gpio\n");
